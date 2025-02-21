@@ -1,4 +1,5 @@
 <?php
+//Conectar a la base de datos
 class Database{
     private $host = '203.161.62.79';
     private $dbname = 'desarrollo_dteae_administracion';
