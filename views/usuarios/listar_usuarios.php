@@ -41,8 +41,8 @@ $usuarios = $usuario->listarUsuarios(); // Obtener la lista de usuarios
                     <td><?php echo htmlspecialchars($usuario['correo']); ?></td>
                     <td><?php echo htmlspecialchars($usuario['rol']); ?></td>
                     <td>
-                        <a href="editar_usuario.php?id=<?php echo $usuario['id_usuario']; ?>" class="btn btn-warning">Editar</a>
-                        <a href="eliminar_usuario.php?id=<?php echo $usuario['id_usuario']; ?>" class="btn btn-danger">Eliminar</a>
+                        <a href="editar_usuario?id=<?php echo $usuario['id_usuario']; ?>" class="btn btn-warning">Editar</a>
+                        <!-- <a href="eliminar_usuario?id=<?php echo $usuario['id_usuario']; ?>" class="btn btn-danger">Eliminar</a> -->
                     </td>
                 </tr>
             <?php endforeach; ?>

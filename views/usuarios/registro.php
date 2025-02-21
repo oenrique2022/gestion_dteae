@@ -5,7 +5,7 @@ include '../../includes/header.php';
 
 <div class="container mt-4">
     <h1>Registrar Usuario</h1>
-    <form action="procesar_registro.php" method="POST">
+    <form action="procesar_registro" method="POST">
         <div class="form-group">
             <label for="nombre">Nombre</label>
             <input type="text" class="form-control" id="nombre" name="nombre" required>

@@ -81,7 +81,7 @@ const BASE_URL = "<?= BASE_URL ?>";
             </ul>
             <ul class="navbar-nav ms-auto">
                 <li class="nav-item">
-                    <a class="nav-link" href="/logout">
+                    <a class="nav-link" href="../login">
                         <i class="bi bi-box-arrow-right"></i> Cerrar Sesión
                     </a>
                 </li>

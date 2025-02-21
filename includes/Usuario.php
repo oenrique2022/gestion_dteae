@@ -6,9 +6,9 @@ class Usuario extends Database {
 
     // Obtener un usuario por su correo
     public function obtenerPorEmail($email){
-        $query = "SELECT * FROM usuarios WHERE correo = :correo";
+        $query = "SELECT * FROM usuarios WHERE nombre_usuario = :nombre_usuario";
         $stmt = $this->conn->prepare($query);
-        $stmt->bindParam(':correo', $email);
+        $stmt->bindParam(':nombre_usuario', $email);
         $stmt->execute();
         return $stmt->fetch(PDO::FETCH_ASSOC);
     }
@@ -34,7 +34,7 @@ class Usuario extends Database {
 
     // Obtener un usuario por su ID
     public function obtenerPorId($id){
-        $query = "SELECT * FROM usuarios WHERE id = :id";
+        $query = "SELECT * FROM usuarios WHERE id_usuario = :id";
         $stmt = $this->conn->prepare($query);
         $stmt->bindParam(':id', $id);
         $stmt->execute();
@@ -43,9 +43,9 @@ class Usuario extends Database {
 
     // Actualizar un usuario
     public function actualizarUsuario($id, $nombre, $email, $password, $id_rol){
-        $query = "UPDATE usuarios SET nombre_usuario = :nombre_usuario, correo = :correo, password = :password, id_rol = :id_rol WHERE id = :id";
+        $query = "UPDATE usuarios SET nombre_usuario = :nombre_usuario, correo = :correo, password = :password, id_rol = :id_rol WHERE id_usuario = :id_usuario";
         $stmt = $this->conn->prepare($query);
-        $stmt->bindParam(':id', $id);
+        $stmt->bindParam(':id_usuario', $id);
         $stmt->bindParam(':nombre_usuario', $nombre);
         $stmt->bindParam(':correo', $email);
         $stmt->bindParam(':password', $password);

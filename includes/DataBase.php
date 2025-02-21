@@ -2,8 +2,8 @@
 class Database{
     private $host = '203.161.62.79';
     private $dbname = 'desarrollo_dteae_administracion';
-    private $username = 'root2';
-    private $password = 'reyesl001';
+    private $username = 'dtae';
+    private $password = 'dtae2025@';
     protected $conn;
     public function __construct() {
         try {

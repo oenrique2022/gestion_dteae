@@ -15,10 +15,10 @@ if ($usuario) {
         $_SESSION['usuario_id'] = $usuario['id'];
         $_SESSION['usuario_rol'] = $usuario['rol'];
         $_SESSION['usuario_nombre'] = $usuario['nombre'];
-        header("Location: ../views/dashboard.php");
+        header("Location: dashboard/dashboard");
     } else {
-        echo "Contraseña incorrecta.";
+        header("Location: login?error=1");
     }
 } else {
-    echo "Usuario no encontrado.";
+    header("Location: login?error=1");
 }

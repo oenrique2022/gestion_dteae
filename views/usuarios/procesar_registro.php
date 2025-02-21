@@ -23,7 +23,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($exito) {
         $_SESSION['mensaje'] = "Usuario registrado exitosamente.";
-        header("Location: listar_usuarios.php");
+        header("Location: listar_usuarios");
     } else {
         echo "Error al registrar el usuario.";
     }
