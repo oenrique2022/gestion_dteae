@@ -168,7 +168,7 @@ $fuentes = $ffModel->leerTodos();
             <select id="centros_educativos_hidden" style="display: none;">
             <option value="">Seleccione...</option>
             <?php foreach($centros as $centro): ?>
-            <option value="<?= $centro['centro_id'] ?>"><?= htmlspecialchars($centro['nombre_ce']) ?></option>
+            <option value="<?= $centro['centro_id'] ?>"><?= htmlspecialchars($centro['codigo_infraestructura']." ".$centro['nombre_ce']) ?></option>
             <?php endforeach; ?>
             </select>
 
