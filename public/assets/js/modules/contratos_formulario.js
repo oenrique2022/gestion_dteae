@@ -115,7 +115,7 @@ $(document).ready(function() {
             headerBadge.text(this.value);
             headerBadge.removeClass('bg-success bg-info text-dark').addClass(this.value === 'Entregado' ? 'bg-success' : 'bg-info text-dark');
         });
-    };s
+    };
 
     btnAgregarEquipo.on('click', () => crearFilaEquipo());
     btnAgregarEntrega.on('click', () => crearBloqueEntrega(null));
