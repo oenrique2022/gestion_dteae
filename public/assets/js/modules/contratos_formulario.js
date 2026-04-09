@@ -1,21 +1,95 @@
-$(document).ready(function() {
+/**
+ * Formulario de contrato: equipos, entregas (Select2), guardado AJAX.
+ * Select2 no debe inicializarse en pestañas ocultas: se usa dropdownParent(body) y se inicializa al mostrar la pestaña Entregas.
+ */
+$(document).ready(function () {
     const form = document.getElementById('formContrato');
     if (!form) return;
 
     const detalleEquiposBody = $('#detalleEquiposBody');
     const btnAgregarEquipo = $('#btnAgregarEquipo');
     const contenedorEntregas = $('#contenedorEntregas');
-    const btnAgregarEntrega = $('#btnAgregarEntrega');
     const inputArchivos = $('#documentos');
     const listaArchivosNuevos = $('#listaArchivosNuevos');
     const listaArchivosExistentes = $('#listaArchivosExistentes');
+
+    const tabEntregasBtn = document.querySelector('#entregas-tab');
+    const tabDetallesBtn = document.querySelector('#detalles-tab');
+
+    /** Inicializa Select2 solo en selects de entrega que aún no lo tienen. */
+    const initSelect2Entregas = () => {
+        $('#contenedorEntregas .select-buscador-entrega').each(function () {
+            const $sel = $(this);
+            if ($sel.hasClass('select2-hidden-accessible')) return;
+
+            $sel.select2({
+                theme: 'bootstrap-5',
+                placeholder: 'Escriba para buscar centro...',
+                width: '100%',
+                dropdownParent: $('body'),
+                allowClear: true
+            });
+
+            const $item = $sel.closest('.accordion-item');
+            const syncHeader = () => {
+                const t = $sel.find('option:selected').text().trim();
+                $item.find('.nombre-institucion-header').text(t || 'Seleccione un centro educativo…');
+            };
+
+            $sel.off('change.entregaHeader select2:select.entregaHeader').on('change.entregaHeader select2:select.entregaHeader', syncHeader);
+            syncHeader();
+        });
+    };
+
+    // Al abrir la pestaña Entregas: inicializar buscadores (por si estaban ocultos al cargar la página)
+    if (tabEntregasBtn) {
+        tabEntregasBtn.addEventListener('shown.bs.tab', function () {
+            initSelect2Entregas();
+        });
+    }
+
+    /** Cambia a la pestaña Entregas (click nativo: no depende de window.bootstrap). */
+    const abrirPestanaEntregas = () => {
+        if (tabEntregasBtn) tabEntregasBtn.click();
+    };
+
+    const abrirPestanaDetalles = () => {
+        if (tabDetallesBtn) tabDetallesBtn.click();
+    };
+
+    /**
+     * Ejecuta fn cuando la pestaña Entregas está lista para verse (evita init antes del cambio de pestaña).
+     */
+    const cuandoPestanaEntregasVisible = (fn) => {
+        if (!tabEntregasBtn) {
+            fn();
+            return;
+        }
+        const pane = document.getElementById('entregas');
+        if (pane && pane.classList.contains('show')) {
+            fn();
+            return;
+        }
+        let ejecutado = false;
+        const ejecutar = () => {
+            if (ejecutado) return;
+            ejecutado = true;
+            clearTimeout(fallbackTimer);
+            tabEntregasBtn.removeEventListener('shown.bs.tab', alMostrar);
+            fn();
+        };
+        const alMostrar = () => ejecutar();
+        const fallbackTimer = setTimeout(ejecutar, 600);
+        tabEntregasBtn.addEventListener('shown.bs.tab', alMostrar);
+        abrirPestanaEntregas();
+    };
 
     const crearFilaEquipo = (item = null) => {
         const rowId = item ? item.id : Date.now();
         let opciones = '<option value="">Seleccione...</option>';
         if (typeof equiposDisponibles !== 'undefined') {
-            equiposDisponibles.forEach(eq => {
-                const isSelected = (item && item.equipo_id == eq.id_equipo) ? 'selected' : '';
+            equiposDisponibles.forEach((eq) => {
+                const isSelected = item && String(item.equipo_id) === String(eq.id_equipo) ? 'selected' : '';
                 opciones += `<option value="${eq.id_equipo}" ${isSelected}>${eq.nombre_equipo}</option>`;
             });
         }
@@ -34,22 +108,21 @@ $(document).ready(function() {
         const entregaId = entrega ? entrega.id_entrega : Date.now();
         const opcionesCentros = $('#centros_educativos_hidden').html();
         let lineasEquiposHTML = '';
-        
-        // Obtenemos las líneas de equipo de la Pestaña 1 para construir el detalle
-        $('.fila-equipo-item').each(function(index) {
+
+        $('.fila-equipo-item').each(function (index) {
             const fila = $(this);
             const selectEquipo = fila.find('select');
             const equipoId = selectEquipo.val();
             const equipoTexto = selectEquipo.find('option:selected').text();
             const cantidadTotal = fila.find('input[name*="[cantidad]"]').val();
             if (!equipoId) return;
-    
+
             let cantidadEntregada = 0;
             if (entrega && entrega.detalle) {
-                const itemDetalle = entrega.detalle.find(d => d.id_equipo == equipoId);
+                const itemDetalle = entrega.detalle.find((d) => String(d.id_equipo) === String(equipoId));
                 if (itemDetalle) cantidadEntregada = itemDetalle.cantidad;
             }
-    
+
             lineasEquiposHTML += `
                 <tr>
                     <td><input type="hidden" name="entregas[${entregaId}][items][${index}][equipo_id]" value="${equipoId}">${equipoTexto}</td>
@@ -57,72 +130,119 @@ $(document).ready(function() {
                     <td><input type="number" name="entregas[${entregaId}][items][${index}][cantidad]" class="form-control form-control-sm" value="${cantidadEntregada}" min="0" max="${cantidadTotal}"></td>
                 </tr>`;
         });
-        
-        // Creamos el HTML para el nuevo bloque de acordeón
+
+        const esNueva = !entrega;
+        const btnCollapsed = esNueva ? '' : 'collapsed';
+        const collapseClasses = esNueva ? 'accordion-collapse collapse show' : 'accordion-collapse collapse';
+
         const nuevoBloqueHTML = `
             <div class="accordion-item" id="entrega-${entregaId}">
                 <h2 class="accordion-header" id="heading-${entregaId}">
-                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-${entregaId}">
+                    <button class="accordion-button ${btnCollapsed}" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-${entregaId}">
                         <span class="fw-bold me-2">Entrega para:</span>
-                        <span class="nombre-institucion-header">Cargando...</span>
+                        <span class="nombre-institucion-header">${esNueva ? 'Seleccione un centro educativo…' : 'Cargando…'}</span>
                         <span class="badge ms-auto ${entrega && entrega.estado === 'Entregado' ? 'bg-success' : 'bg-info text-dark'} estado-header">${entrega ? entrega.estado : 'En proceso'}</span>
                     </button>
                 </h2>
-                <div id="collapse-${entregaId}" class="accordion-collapse collapse" data-bs-parent="#contenedorEntregas">
+                <div id="collapse-${entregaId}" class="${collapseClasses}" data-bs-parent="#contenedorEntregas">
                     <div class="accordion-body">
-                        <div class="d-flex justify-content-end mb-3"><button type="button" class="btn btn-outline-danger btn-sm btn-remover-entrega" title="Eliminar esta asignación">Eliminar Asignación</button></div>
-                        <div class="row"><div class="col-12 mb-3"><label class="form-label">Institución</label><select name="entregas[${entregaId}][id_institucion]" class="form-select select-buscador-entrega" required>${opcionesCentros}</select></div></div>
+                        <div class="d-flex justify-content-end mb-3"><button type="button" class="btn btn-outline-danger btn-sm btn-remover-entrega" title="Eliminar esta asignación">Eliminar asignación</button></div>
+                        <div class="row"><div class="col-12 mb-3"><label class="form-label">Institución educativa</label><select name="entregas[${entregaId}][id_institucion]" class="form-select select-buscador-entrega" required>${opcionesCentros}</select></div></div>
                         <div class="row">
-                            <div class="col-md-4 mb-3"><label class="form-label">Fecha de Entrega</label><input type="date" name="entregas[${entregaId}][fecha_entrega]" class="form-control form-control-sm" value="${entrega && entrega.fecha_entrega ? entrega.fecha_entrega : ''}"></div>
-                            <div class="col-md-4 mb-3"><label class="form-label">Persona que Firma</label><input type="text" name="entregas[${entregaId}][firma_responsable]" class="form-control form-control-sm" value="${entrega ? entrega.firma_responsable : ''}"></div>
+                            <div class="col-md-4 mb-3"><label class="form-label">Fecha de entrega</label><input type="date" name="entregas[${entregaId}][fecha_entrega]" class="form-control form-control-sm" value="${entrega && entrega.fecha_entrega ? String(entrega.fecha_entrega).substring(0, 10) : ''}"></div>
+                            <div class="col-md-4 mb-3"><label class="form-label">Persona que firma</label><input type="text" name="entregas[${entregaId}][firma_responsable]" class="form-control form-control-sm" value="${entrega ? (entrega.firma_responsable || '') : ''}"></div>
                             <div class="col-md-4 mb-3"><label class="form-label">Estado</label><select name="entregas[${entregaId}][estado]" class="form-select form-select-sm estado-select"><option value="En proceso" ${entrega && entrega.estado === 'En proceso' ? 'selected' : ''}>En proceso</option><option value="Entregado" ${entrega && entrega.estado === 'Entregado' ? 'selected' : ''}>Entregado</option></select></div>
                         </div>
-                        <div class="mb-3"><label class="form-label">Comentarios</label><textarea name="entregas[${entregaId}][comentarios]" class="form-control form-control-sm" rows="2">${entrega ? entrega.comentarios : ''}</textarea></div>
-                        <p class="fw-bold small mb-1">Equipos para esta entrega:</p>
-                        <table class="table table-sm table-bordered"><thead class="table-light"><tr><th>Equipo</th><th>Cant. Contrato</th><th>Cant. a Entregar</th></tr></thead><tbody>${lineasEquiposHTML}</tbody></table>
+                        <div class="mb-3"><label class="form-label">Comentarios</label><textarea name="entregas[${entregaId}][comentarios]" class="form-control form-control-sm" rows="2">${entrega ? (entrega.comentarios || '') : ''}</textarea></div>
+                        <p class="fw-bold small mb-1">Equipos para esta entrega</p>
+                        ${lineasEquiposHTML === '' ? '<p class="text-warning small mb-2"><i class="fas fa-exclamation-triangle me-1"></i>Agregue líneas de equipo en la pestaña <strong>1. Detalles y Líneas</strong> para asignar cantidades.</p>' : ''}
+                        <table class="table table-sm table-bordered"><thead class="table-light"><tr><th>Equipo</th><th>Cant. contrato</th><th>Cant. a entregar</th></tr></thead><tbody>${lineasEquiposHTML || '<tr><td colspan="3" class="text-muted small">Sin líneas de equipo</td></tr>'}</tbody></table>
                     </div>
                 </div>
             </div>`;
-        
-        // Añadimos el bloque al contenedor
+
         contenedorEntregas.append(nuevoBloqueHTML);
-        
-        // Inicializamos Select2
+
         const itemAcordeon = $(`#entrega-${entregaId}`);
         const selectCentro = itemAcordeon.find('.select-buscador-entrega');
-        selectCentro.select2({ theme: 'bootstrap-5', placeholder: 'Escriba para buscar...', dropdownParent: itemAcordeon });
-        
-        // --- INICIO DE LA CORRECCIÓN ---
+
         if (entrega) {
-            // 1. Establecemos el valor guardado en el select
-            selectCentro.val(entrega.id_institucion).trigger('change.select2'); // Usar .trigger('change.select2') es más específico para el plugin
-            
-            // 2. Obtenemos el texto de la opción seleccionada
+            selectCentro.val(entrega.id_institucion);
             const textoInstitucion = selectCentro.find('option:selected').text();
-            
-            // 3. Actualizamos el encabezado del acordeón directamente
-            itemAcordeon.find('.nombre-institucion-header').text(textoInstitucion.trim());
+            itemAcordeon.find('.nombre-institucion-header').text(textoInstitucion.trim() || '—');
         }
-        // --- FIN DE LA CORRECCIÓN ---
-    
-        // Lógica para actualizar los encabezados en tiempo real
-        selectCentro.on('change', function() {
-            itemAcordeon.find('.nombre-institucion-header').text($(this).find('option:selected').text().trim() || 'Seleccione una institución...');
-        });
-    
-        itemAcordeon.find('.estado-select').on('change', function() {
+
+        itemAcordeon.find('.estado-select').on('change', function () {
             const headerBadge = itemAcordeon.find('.estado-header');
             headerBadge.text(this.value);
             headerBadge.removeClass('bg-success bg-info text-dark').addClass(this.value === 'Entregado' ? 'bg-success' : 'bg-info text-dark');
         });
+
+        // Solo inicializar Select2 si la pestaña Entregas está visible (evita fallos en pestaña oculta)
+        if ($('#entregas').hasClass('show')) {
+            initSelect2Entregas();
+        }
     };
 
     btnAgregarEquipo.on('click', () => crearFilaEquipo());
-    btnAgregarEntrega.on('click', () => crearBloqueEntrega(null));
-    contenedorEntregas.on('click', '.btn-remover-entrega', function() { $(this).closest('.accordion-item').remove(); });
-    detalleEquiposBody.on('click', '.btn-remover-fila', function() { $(this).closest('tr').remove(); });
 
-    inputArchivos.on('change', function() {
+    const clickAsignarEntrega = function () {
+        const filasEq = $('.fila-equipo-item').length;
+        if (filasEq === 0) {
+            const continuarSinLineas = () => {
+                cuandoPestanaEntregasVisible(() => {
+                    crearBloqueEntrega(null);
+                    initSelect2Entregas();
+                });
+            };
+            if (typeof Swal === 'undefined') {
+                if (window.confirm('No hay líneas de equipo. ¿Ir a la pestaña Detalles para agregarlas?')) {
+                    abrirPestanaDetalles();
+                } else {
+                    continuarSinLineas();
+                }
+                return;
+            }
+            Swal.fire({
+                icon: 'info',
+                title: 'Líneas de equipo',
+                html: 'Para asignar cantidades por centro, primero agregue al menos una <strong>línea de equipo</strong> en la pestaña <strong>1. Detalles y Líneas</strong>.',
+                showCancelButton: true,
+                confirmButtonText: 'Ir a Detalles',
+                cancelButtonText: 'Continuar igual',
+                reverseButtons: true
+            }).then((r) => {
+                if (r.isConfirmed) {
+                    abrirPestanaDetalles();
+                }
+                if (!r.isConfirmed) {
+                    continuarSinLineas();
+                }
+            });
+            return;
+        }
+
+        cuandoPestanaEntregasVisible(() => {
+            crearBloqueEntrega(null);
+            initSelect2Entregas();
+        });
+    };
+
+    // Delegación: el botón está en una pestaña oculta a veces; evita fallos de binding directo
+    $(form).on('click', '#btnAgregarEntrega', function (e) {
+        e.preventDefault();
+        clickAsignarEntrega();
+    });
+
+    contenedorEntregas.on('click', '.btn-remover-entrega', function () {
+        $(this).closest('.accordion-item').remove();
+    });
+
+    detalleEquiposBody.on('click', '.btn-remover-fila', function () {
+        $(this).closest('tr').remove();
+    });
+
+    inputArchivos.on('change', function () {
         listaArchivosNuevos.html('');
         if (this.files.length > 0) listaArchivosNuevos.html('<h6 class="mt-3">Archivos a subir:</h6>');
         Array.from(this.files).forEach((file, index) => {
@@ -135,42 +255,63 @@ $(document).ready(function() {
         });
     });
 
-    if (listaArchivosExistentes) {
-        listaArchivosExistentes.on('click', '.btn-eliminar-documento', function() {
+    if (listaArchivosExistentes && listaArchivosExistentes.length) {
+        listaArchivosExistentes.on('click', '.btn-eliminar-documento', function () {
             const id_documento = $(this).data('id');
-            // ... (lógica de eliminar documento)
+            if (id_documento) {
+                Swal.fire({ title: '¿Eliminar archivo?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Sí, eliminar' }).then((r) => {
+                    if (!r.isConfirmed) return;
+                    $.post('../app/ajax/contratos_ajax.php', { action: 'eliminar_documento', id_documento }, function (data) {
+                        if (data.success) {
+                            $(`#doc-${id_documento}`).remove();
+                            Swal.fire('Listo', 'Archivo eliminado.', 'success');
+                        } else Swal.fire('Error', data.message || 'No se pudo eliminar.', 'error');
+                    }, 'json').fail(() => Swal.fire('Error', 'Sin conexión.', 'error'));
+                });
+            }
         });
     }
 
-    $(form).on('submit', function(e) {
+    $(form).on('submit', function (e) {
         e.preventDefault();
         const formData = new FormData(this);
         const action = $('#id_contrato').val() ? 'actualizar' : 'guardar';
         formData.append('action', action);
 
-        Swal.fire({ title: 'Guardando Contrato', text: 'Por favor, espere...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+        Swal.fire({ title: 'Guardando contrato', text: 'Por favor espere…', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
 
         $.ajax({
             url: '../app/ajax/contratos_ajax.php',
             type: 'POST',
             data: formData,
-            processData: false, contentType: false, dataType: 'json',
-            success: function(data) {
+            processData: false,
+            contentType: false,
+            dataType: 'json',
+            success: function (data) {
                 if (data.success) {
-                    Swal.fire('¡Éxito!', data.message, 'success').then(() => { window.location.href = 'gestion_contratos.php'; });
-                } else { Swal.fire('Error', data.message || 'Ocurrió un error.', 'error'); }
+                    Swal.fire('¡Listo!', data.message, 'success').then(() => {
+                        window.location.href = 'gestion_contratos.php';
+                    });
+                } else Swal.fire('Error', data.message || 'Ocurrió un error.', 'error');
             },
-            error: function() { Swal.fire('Error de Conexión', 'No se pudo comunicar con el servidor.', 'error'); }
+            error: function () {
+                Swal.fire('Error de conexión', 'No se pudo comunicar con el servidor.', 'error');
+            }
         });
     });
 
     const inicializarFormulario = () => {
         if (modoFormulario === 'editar') {
-            if (equiposContrato && equiposContrato.length > 0) equiposContrato.forEach(item => crearFilaEquipo(item));
-            if (entregasContrato && entregasContrato.length > 0) entregasContrato.forEach(entrega => crearBloqueEntrega(entrega));
+            if (equiposContrato && equiposContrato.length > 0) {
+                equiposContrato.forEach((item) => crearFilaEquipo(item));
+            }
+            if (entregasContrato && entregasContrato.length > 0) {
+                entregasContrato.forEach((entrega) => crearBloqueEntrega(entrega));
+            }
         } else if (modoFormulario === 'crear') {
             crearFilaEquipo();
         }
     };
+
     inicializarFormulario();
 });

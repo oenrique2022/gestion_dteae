@@ -29,17 +29,18 @@ $fuentes = $ffModel->leerTodos();
 <form id="formContrato" enctype="multipart/form-data" method="POST">
     <input type="hidden" name="id_contrato" id="id_contrato" value="<?= htmlspecialchars($contrato['generales']['id'] ?? '') ?>">
 
-    <ul class="nav nav-tabs" id="contratoTabs" role="tablist">
+    <ul class="nav nav-tabs flex-nowrap overflow-auto" id="contratoTabs" role="tablist" style="border-bottom: 0;">
         <li class="nav-item" role="presentation">
-            <button class="nav-link active" id="detalles-tab" data-bs-toggle="tab" data-bs-target="#detalles" type="button" role="tab" aria-controls="detalles" aria-selected="true">1. Detalles y Líneas</button>
+            <button class="nav-link active px-3" id="detalles-tab" data-bs-toggle="tab" data-bs-target="#detalles" type="button" role="tab" aria-controls="detalles" aria-selected="true"><span class="badge bg-secondary me-1">1</span>Detalles y equipos</button>
         </li>
         <li class="nav-item" role="presentation">
-            <button class="nav-link" id="archivos-tab" data-bs-toggle="tab" data-bs-target="#archivos" type="button" role="tab" aria-controls="archivos" aria-selected="false">2. Archivos Adjuntos</button>
+            <button class="nav-link px-3" id="archivos-tab" data-bs-toggle="tab" data-bs-target="#archivos" type="button" role="tab" aria-controls="archivos" aria-selected="false"><span class="badge bg-secondary me-1">2</span>Archivos</button>
         </li>
         <li class="nav-item" role="presentation">
-            <button class="nav-link" id="entregas-tab" data-bs-toggle="tab" data-bs-target="#entregas" type="button" role="tab" aria-controls="entregas" aria-selected="false">3. Entregas</button>
+            <button class="nav-link px-3" id="entregas-tab" data-bs-toggle="tab" data-bs-target="#entregas" type="button" role="tab" aria-controls="entregas" aria-selected="false"><span class="badge bg-secondary me-1">3</span>Entregas por centro</button>
         </li>
     </ul>
+    <p class="small text-muted mb-3 px-1">Defina primero los equipos del contrato; luego asigne entregas por centro. Guarde al final.</p>
 
     <div class="tab-content" id="contratoTabsContent">
         
@@ -106,10 +107,7 @@ $fuentes = $ffModel->leerTodos();
                     <table class="table table-sm">
                         <thead class="table-light"><tr><th>Equipo</th><th>Marca</th><th>Cantidad</th><th>Precio Unitario</th><th><button type="button" id="btnAgregarEquipo" class="btn btn-success btn-sm py-0 px-1" title="Agregar Fila"><i class="fas fa-plus"></i></button></th></tr></thead>
                         <tbody id="detalleEquiposBody">
-                            <?php if ($modo === 'editar' && !empty($contrato['equipos'])): ?>
-                                <?php foreach($contrato['equipos'] as $item): ?>
-                                    <?php endforeach; ?>
-                            <?php endif; ?>
+                            <?php /* Las filas se generan en JS desde equiposContrato (crear/editar) */ ?>
                         </tbody>
                     </table>
                 </div>
@@ -156,15 +154,16 @@ $fuentes = $ffModel->leerTodos();
 <div class="tab-pane fade" id="entregas" role="tabpanel" aria-labelledby="entregas-tab">
     <div class="card border-top-0 rounded-0 rounded-bottom">
         <div class="card-body p-4">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h5>Detalle de Entregas por Institución</h5>
-                <button type="button" id="btnAgregarEntrega" class="btn btn-success btn-sm">
-                    <i class="fas fa-plus me-1"></i> Asignar Nueva Entrega
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                <h5 class="mb-0">Entregas por institución</h5>
+                <button type="button" id="btnAgregarEntrega" class="btn btn-success">
+                    <i class="fas fa-plus me-1"></i>Asignar nueva entrega
                 </button>
             </div>
-            <p class="text-muted small">
-                Añada las líneas de equipos en la Pestaña 1. Luego, aquí podrá crear "paquetes de entrega" para cada centro educativo, especificando qué equipos y qué cantidades recibirá cada uno.
-            </p>
+            <div class="alert alert-light border small py-2 mb-3">
+                <i class="fas fa-info-circle text-primary me-1"></i>
+                Cada entrega corresponde a un centro educativo. Indique cantidades por equipo según las líneas definidas en <strong>Detalles y equipos</strong>.
+            </div>
             <select id="centros_educativos_hidden" style="display: none;">
             <option value="">Seleccione...</option>
             <?php foreach($centros as $centro): ?>
@@ -177,9 +176,11 @@ $fuentes = $ffModel->leerTodos();
     </div>
 </div>
 
-    <div class="text-end mt-4">
-        <a href="gestion_contratos.php" class="btn btn-secondary">Cancelar</a>
-        <button type="submit" class="btn btn-primary"><i class="fas fa-save me-1"></i> Guardar Contrato</button>
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-4 pt-3 border-top">
+        <a href="gestion_contratos.php" class="btn btn-outline-secondary"><i class="fas fa-arrow-left me-1"></i>Volver al listado</a>
+        <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary btn-lg px-4"><i class="fas fa-save me-1"></i>Guardar contrato</button>
+        </div>
     </div>
 </form>
 
