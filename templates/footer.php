@@ -11,6 +11,12 @@
 
 <script src="<?php echo APP_URL; ?>/assets/js/app.js"></script>
 
+<?php if (!empty($extra_scripts) && is_array($extra_scripts)): ?>
+<?php foreach ($extra_scripts as $url): ?>
+<script src="<?php echo htmlspecialchars((string) $url, ENT_QUOTES, 'UTF-8'); ?>"></script>
+<?php endforeach; ?>
+<?php endif; ?>
+
 <?php if (isset($pagina_js)): ?>
     <script src="<?php echo APP_URL; ?>/assets/js/modules/<?php echo $pagina_js; ?>"></script>
 <?php endif; ?>

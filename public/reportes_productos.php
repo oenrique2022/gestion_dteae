@@ -5,9 +5,14 @@
         <h2 class="h5 mb-0">
             <i class="fas fa-boxes me-2"></i>Informe — Productos y centros educativos
         </h2>
-        <a href="reportes.php" class="btn btn-outline-secondary btn-sm">
-            <i class="fas fa-arrow-left me-1"></i> Ver entregas por centro
-        </a>
+        <div class="d-flex flex-wrap gap-2">
+            <a href="reportes_dashboard.php" class="btn btn-outline-secondary btn-sm">
+                <i class="fas fa-chart-line me-1"></i> Dashboard
+            </a>
+            <a href="reportes.php" class="btn btn-outline-secondary btn-sm">
+                <i class="fas fa-school me-1"></i> Entregas por centro
+            </a>
+        </div>
     </div>
     <div class="card-body">
         <p class="text-muted small mb-3">

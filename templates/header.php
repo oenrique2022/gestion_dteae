@@ -34,6 +34,7 @@ require_once __DIR__ . '/../app/includes/config.php'; ?>
                     <ul class="dropdown-menu">
                         <li><a class="dropdown-item" href="reportes.php"><i class="fas fa-school me-2 text-primary"></i>Entregas por centro</a></li>
                         <li><a class="dropdown-item" href="reportes_productos.php"><i class="fas fa-boxes me-2 text-primary"></i>Productos y centros</a></li>
+                        <li><a class="dropdown-item" href="reportes_dashboard.php"><i class="fas fa-chart-line me-2 text-primary"></i>Dashboard gerencial</a></li>
                     </ul>
                 </li>
             </ul>
