@@ -123,22 +123,38 @@ class Contrato {
             $stmt->execute([':id' => $id]);
             $contrato['documentos'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
-            // --- INICIO DE LA ACTUALIZACIÓN ---
-            // 4. Obtener entregas y sus detalles
-            $contrato['entregas'] = [];
-            $stmt_entregas = $this->conn->prepare("SELECT * FROM entregas WHERE id_contrato = :id");
+            // 4. Entregas y detalles (una consulta para detalles: evita N+1 si hay muchas entregas)
+            $stmt_entregas = $this->conn->prepare("SELECT * FROM entregas WHERE id_contrato = :id ORDER BY id_entrega");
             $stmt_entregas->execute([':id' => $id]);
-            
-            while ($fila_entrega = $stmt_entregas->fetch(PDO::FETCH_ASSOC)) {
-                $id_entrega_actual = $fila_entrega['id_entrega'];
-                
-                $stmt_detalles = $this->conn->prepare("SELECT * FROM entregas_detalle WHERE id_entrega = :id_entrega");
-                $stmt_detalles->execute([':id_entrega' => $id_entrega_actual]);
-                
-                $fila_entrega['detalle'] = $stmt_detalles->fetchAll(PDO::FETCH_ASSOC);
-                $contrato['entregas'][] = $fila_entrega;
+            $filas_entregas = $stmt_entregas->fetchAll(PDO::FETCH_ASSOC);
+
+            if ($filas_entregas === []) {
+                $contrato['entregas'] = [];
+            } else {
+                $ids_entrega = array_column($filas_entregas, 'id_entrega');
+                $placeholders = implode(',', array_fill(0, count($ids_entrega), '?'));
+                $stmt_detalles = $this->conn->prepare(
+                    "SELECT * FROM entregas_detalle WHERE id_entrega IN ($placeholders) ORDER BY id_entrega, id_equipo"
+                );
+                $stmt_detalles->execute($ids_entrega);
+                $todas_lineas = $stmt_detalles->fetchAll(PDO::FETCH_ASSOC);
+
+                $detalle_por_entrega = [];
+                foreach ($todas_lineas as $linea) {
+                    $ie = $linea['id_entrega'];
+                    if (!isset($detalle_por_entrega[$ie])) {
+                        $detalle_por_entrega[$ie] = [];
+                    }
+                    $detalle_por_entrega[$ie][] = $linea;
+                }
+
+                foreach ($filas_entregas as &$fila_entrega) {
+                    $ie = $fila_entrega['id_entrega'];
+                    $fila_entrega['detalle'] = $detalle_por_entrega[$ie] ?? [];
+                }
+                unset($fila_entrega);
+                $contrato['entregas'] = $filas_entregas;
             }
-            // --- FIN DE LA ACTUALIZACIÓN ---
     
             return $contrato;
         } catch (PDOException $e) {
