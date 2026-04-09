@@ -62,4 +62,44 @@ class Reporte {
             return [];
         }
     }
+
+    /**
+     * Cada fila = una línea de entrega (producto) con el centro y contrato asociados.
+     */
+    public function listarProductosEntregadosPorCentro(): array {
+        try {
+            $sql = "SELECT 
+                        ed.id_entrega,
+                        ed.id_equipo,
+                        ed.cantidad,
+                        ed.comentario AS detalle_comentario,
+                        COALESCE(eq.nombre_equipo, CONCAT('Equipo #', CAST(ed.id_equipo AS CHAR))) AS nombre_equipo,
+                        eq.codigo_equipo,
+                        te.nombre_tipo_equipo,
+                        e.id_institucion,
+                        e.fecha_entrega,
+                        e.estado,
+                        ce.centro_id,
+                        ce.nombre_ce,
+                        ce.codigo_infraestructura,
+                        c.id AS id_contrato,
+                        c.numero_contrato,
+                        c.nombre_contrato
+                    FROM entregas_detalle ed
+                    INNER JOIN entregas e ON ed.id_entrega = e.id_entrega
+                    INNER JOIN contratos c ON e.id_contrato = c.id
+                    LEFT JOIN equipos eq ON ed.id_equipo = eq.id_equipo
+                    LEFT JOIN tipos_equipos te ON eq.id_tipo_equipo = te.id_tipo_equipo
+                    LEFT JOIN centros_educativos ce ON e.id_institucion = ce.centro_id
+                    ORDER BY nombre_equipo ASC,
+                             COALESCE(ce.nombre_ce, CONCAT('ID ', e.id_institucion)) ASC,
+                             e.fecha_entrega DESC";
+            $stmt = $this->conn->prepare($sql);
+            $stmt->execute();
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log($e->getMessage());
+            return [];
+        }
+    }
 }

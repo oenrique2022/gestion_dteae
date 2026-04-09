@@ -13,6 +13,11 @@ switch ($action) {
         $response = ['success' => true, 'data' => $datos];
         break;
 
+    case 'listar_productos_por_centro':
+        $datos = $reporteModel->listarProductosEntregadosPorCentro();
+        $response = ['success' => true, 'data' => $datos];
+        break;
+
     default:
         break;
 }

@@ -1,10 +1,13 @@
 <?php require_once __DIR__ . '/../templates/header.php'; ?>
 
 <div class="card shadow-sm">
-    <div class="card-header d-flex justify-content-between align-items-center">
+    <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
         <h2 class="h5 mb-0">
             <i class="fas fa-chart-bar me-2"></i>Reportes — Entregas por centro educativo
         </h2>
+        <a href="reportes_productos.php" class="btn btn-outline-secondary btn-sm">
+            <i class="fas fa-boxes me-1"></i> Informe por producto
+        </a>
     </div>
     <div class="card-body">
         <p class="text-muted small mb-3">
