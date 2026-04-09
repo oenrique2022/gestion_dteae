@@ -36,6 +36,9 @@ class Equipo {
         }
     }
 
+    /**
+     * @return int|false id_equipo insertado, o false si falla
+     */
     public function crear($codigo, $nombre, $id_tipo, $descripcion) {
         try {
             $query = "INSERT INTO " . $this->table_name . " (codigo_equipo, nombre_equipo, id_tipo_equipo, descripcion, usuario_creador) VALUES (:codigo, :nombre, :id_tipo, :desc, 'System')";
@@ -44,7 +47,12 @@ class Equipo {
             $stmt->bindParam(':nombre', $nombre);
             $stmt->bindParam(':id_tipo', $id_tipo);
             $stmt->bindParam(':desc', $descripcion);
-            return $stmt->execute();
+            if (!$stmt->execute()) {
+                return false;
+            }
+            $id = (int) $this->conn->lastInsertId();
+
+            return $id > 0 ? $id : false;
         } catch (PDOException $e) {
             return false;
         }

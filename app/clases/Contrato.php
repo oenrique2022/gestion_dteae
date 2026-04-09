@@ -7,6 +7,16 @@ class Contrato {
     public function __construct() {
         $this->conn = Database::getInstance()->getConnection();
     }
+
+    /** @param list<array<string,mixed>> $filas */
+    private static function filasClavesMinusculas(array $filas): array {
+        return array_map(
+            static function (array $row) {
+                return array_change_key_case($row, CASE_LOWER);
+            },
+            $filas
+        );
+    }
     public function crearContratoCompleto($datosContrato, $detallesEquipos, $entregas, $archivos) {
         $this->conn->beginTransaction();
         try {
@@ -109,47 +119,58 @@ class Contrato {
             // 1. Obtener datos generales del contrato (sin cambios)
             $stmt = $this->conn->prepare("SELECT * FROM contratos WHERE id = :id");
             $stmt->execute([':id' => $id]);
-            $contrato['generales'] = $stmt->fetch(PDO::FETCH_ASSOC);
-    
-            if(!$contrato['generales']) return null;
+            $gen = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$gen) {
+                return null;
+            }
+            $contrato['generales'] = array_change_key_case($gen, CASE_LOWER);
     
             // 2. Obtener equipos asociados (sin cambios)
             $stmt = $this->conn->prepare("SELECT * FROM contratos_equipos WHERE contrato_id = :id");
             $stmt->execute([':id' => $id]);
-            $contrato['equipos'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $contrato['equipos'] = self::filasClavesMinusculas($stmt->fetchAll(PDO::FETCH_ASSOC));
     
             // 3. Obtener documentos asociados (sin cambios)
             $stmt = $this->conn->prepare("SELECT * FROM documentos_contratos WHERE contrato_id = :id");
             $stmt->execute([':id' => $id]);
-            $contrato['documentos'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $contrato['documentos'] = self::filasClavesMinusculas($stmt->fetchAll(PDO::FETCH_ASSOC));
     
-            // 4. Entregas y detalles (una consulta para detalles: evita N+1 si hay muchas entregas)
+            // 4. Entregas y detalles (misma lógica que en la UI: centros = id_institucion por fila en `entregas`)
+            // SQL 1: SELECT * FROM entregas WHERE id_contrato = :id ORDER BY id_entrega
+            // SQL 2: SELECT * FROM entregas_detalle WHERE id_entrega IN (...) ORDER BY id_entrega, id_equipo
             $stmt_entregas = $this->conn->prepare("SELECT * FROM entregas WHERE id_contrato = :id ORDER BY id_entrega");
             $stmt_entregas->execute([':id' => $id]);
-            $filas_entregas = $stmt_entregas->fetchAll(PDO::FETCH_ASSOC);
+            $filas_entregas = self::filasClavesMinusculas($stmt_entregas->fetchAll(PDO::FETCH_ASSOC));
 
             if ($filas_entregas === []) {
                 $contrato['entregas'] = [];
             } else {
-                $ids_entrega = array_column($filas_entregas, 'id_entrega');
-                $placeholders = implode(',', array_fill(0, count($ids_entrega), '?'));
-                $stmt_detalles = $this->conn->prepare(
-                    "SELECT * FROM entregas_detalle WHERE id_entrega IN ($placeholders) ORDER BY id_entrega, id_equipo"
-                );
-                $stmt_detalles->execute($ids_entrega);
-                $todas_lineas = $stmt_detalles->fetchAll(PDO::FETCH_ASSOC);
-
-                $detalle_por_entrega = [];
-                foreach ($todas_lineas as $linea) {
-                    $ie = $linea['id_entrega'];
-                    if (!isset($detalle_por_entrega[$ie])) {
-                        $detalle_por_entrega[$ie] = [];
+                $ids_entrega = array_values(array_filter(
+                    array_column($filas_entregas, 'id_entrega'),
+                    static function ($v) {
+                        return $v !== null && $v !== '';
                     }
-                    $detalle_por_entrega[$ie][] = $linea;
+                ));
+                $detalle_por_entrega = [];
+                if ($ids_entrega !== []) {
+                    $placeholders = implode(',', array_fill(0, count($ids_entrega), '?'));
+                    $stmt_detalles = $this->conn->prepare(
+                        "SELECT * FROM entregas_detalle WHERE id_entrega IN ($placeholders) ORDER BY id_entrega, id_equipo"
+                    );
+                    $stmt_detalles->execute($ids_entrega);
+                    $todas_lineas = self::filasClavesMinusculas($stmt_detalles->fetchAll(PDO::FETCH_ASSOC));
+
+                    foreach ($todas_lineas as $linea) {
+                        $ie = (int) $linea['id_entrega'];
+                        if (!isset($detalle_por_entrega[$ie])) {
+                            $detalle_por_entrega[$ie] = [];
+                        }
+                        $detalle_por_entrega[$ie][] = $linea;
+                    }
                 }
 
                 foreach ($filas_entregas as &$fila_entrega) {
-                    $ie = $fila_entrega['id_entrega'];
+                    $ie = (int) $fila_entrega['id_entrega'];
                     $fila_entrega['detalle'] = $detalle_por_entrega[$ie] ?? [];
                 }
                 unset($fila_entrega);

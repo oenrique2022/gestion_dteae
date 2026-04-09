@@ -1,7 +1,20 @@
 <?php
-header('Content-Type: application/json');
+declare(strict_types=1);
+
+header('Content-Type: application/json; charset=utf-8');
+
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+if (!isset($_SESSION['id_usuario'])) {
+    http_response_code(401);
+    echo json_encode(['success' => false, 'message' => 'Sesión requerida']);
+    exit;
+}
+
 require_once __DIR__ . '/../clases/Database.php';
 require_once __DIR__ . '/../clases/Equipo.php';
+require_once __DIR__ . '/../clases/TipoEquipo.php';
 
 $equipo = new Equipo();
 $response = ['success' => false, 'message' => 'Acción no válida'];
@@ -32,13 +45,63 @@ switch ($action) {
         $descripcion = $_POST['descripcion'] ?? '';
 
         if (empty($id)) { // Crear
-            $resultado = $equipo->crear($codigo, $nombre, $id_tipo, $descripcion);
-            $response['message'] = $resultado ? 'Equipo creado exitosamente.' : 'Error al crear el equipo.';
+            $nuevoId = $equipo->crear($codigo, $nombre, $id_tipo, $descripcion);
+            $response['success'] = $nuevoId !== false;
+            $response['message'] = $nuevoId !== false ? 'Equipo creado exitosamente.' : 'Error al crear el equipo.';
+            if ($nuevoId !== false) {
+                $response['data'] = ['id_equipo' => $nuevoId];
+            }
         } else { // Actualizar
             $resultado = $equipo->actualizar($id, $codigo, $nombre, $id_tipo, $descripcion);
             $response['message'] = $resultado ? 'Equipo actualizado exitosamente.' : 'Error al actualizar el equipo.';
+            $response['success'] = $resultado;
         }
-        $response['success'] = $resultado;
+        break;
+
+    /** Alta rápida desde formulario de contrato (nombre + tipo; código opcional). */
+    case 'crear_rapido':
+        $nombre = trim((string) ($_POST['nombre_equipo'] ?? ''));
+        $codigo = trim((string) ($_POST['codigo_equipo'] ?? ''));
+        $idTipoRaw = $_POST['id_tipo_equipo'] ?? '';
+
+        $nombreLen = function_exists('mb_strlen') ? mb_strlen($nombre, 'UTF-8') : strlen($nombre);
+        if ($nombre === '' || $nombreLen < 2) {
+            $response['message'] = 'Indique un nombre de equipo válido.';
+            break;
+        }
+
+        $tipoModel = new TipoEquipo();
+        $tipos = $tipoModel->leerTodos();
+        $idTipo = null;
+        if ($idTipoRaw !== '' && $idTipoRaw !== null && is_numeric($idTipoRaw)) {
+            $idTipo = (int) $idTipoRaw;
+        } elseif (!empty($tipos)) {
+            $idTipo = (int) ($tipos[0]['id_tipo_equipo'] ?? 0);
+        }
+
+        if ($idTipo === null || $idTipo <= 0) {
+            $response['message'] = 'No hay tipos de equipo en el catálogo. Cree uno en la gestión de equipos.';
+            break;
+        }
+
+        if ($codigo === '') {
+            $codigo = 'CAT-' . substr(str_replace('.', '', uniqid('', true)), -10);
+        }
+
+        $desc = 'Alta desde formulario de contrato';
+        $nuevoId = $equipo->crear($codigo, $nombre, (string) $idTipo, $desc);
+        if ($nuevoId === false) {
+            $response['message'] = 'No se pudo guardar el equipo. Verifique que el código no esté duplicado.';
+            break;
+        }
+
+        $response['success'] = true;
+        $response['message'] = 'Equipo añadido al catálogo.';
+        $response['data'] = [
+            'id_equipo' => $nuevoId,
+            'nombre_equipo' => $nombre,
+            'codigo_equipo' => $codigo,
+        ];
         break;
 
     case 'eliminar':
@@ -55,12 +118,10 @@ switch ($action) {
         $response['success'] = $resultado;
         $response['message'] = $resultado ? 'Estado actualizado correctamente.' : 'Error al actualizar el estado.';
         break;
-        // ... dentro del switch ($action) ...
-        case 'listar_activos':
-        // Este método necesitará ser creado en tu clase Equipo.php
-        // Deberá hacer: "SELECT id_equipo, nombre_equipo FROM equipos WHERE activo = 1"
+
+    case 'listar_activos':
         $response['success'] = true;
-        $response['data'] = $equipo->leerActivos(); // Asegúrate de crear este método en el modelo
+        $response['data'] = $equipo->leerActivos();
         break;
 }
 

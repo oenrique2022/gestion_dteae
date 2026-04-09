@@ -6,6 +6,7 @@ require_once __DIR__ . '/../templates/header.php';
 // Cargar todos los modelos necesarios para los menús desplegables
 require_once __DIR__ . '/../app/clases/Proveedor.php';
 require_once __DIR__ . '/../app/clases/Equipo.php';
+require_once __DIR__ . '/../app/clases/TipoEquipo.php';
 require_once __DIR__ . '/../app/clases/CentroEducativo.php';
 require_once __DIR__ . '/../app/clases/FuenteFinanciamiento.php'; // Asegúrate de haber creado este archivo
 
@@ -15,6 +16,9 @@ $proveedores = $proveedorModel->leerTodos();
 
 $equipoModel = new Equipo();
 $equipos = $equipoModel->leerActivos(); // Usaremos esto para el JavaScript
+
+$tipoEquipoModel = new TipoEquipo();
+$tipos_equipo_catalogo = $tipoEquipoModel->leerTodos();
 
 $ceModel = new CentroEducativo();
 $centros = $ceModel->leerTodos();
@@ -102,14 +106,40 @@ $fuentes = $ffModel->leerTodos();
                         <textarea class="form-control" id="comentarios" name="comentarios" rows="2"><?= htmlspecialchars($contrato['generales']['comentarios'] ?? '') ?></textarea>
                     </div>
 
-                    <h5 class="mt-4">Detalle de Equipos</h5>
-                    <hr>
-                    <table class="table table-sm">
-                        <thead class="table-light"><tr><th>Equipo</th><th>Marca</th><th>Cantidad</th><th>Precio Unitario</th><th><button type="button" id="btnAgregarEquipo" class="btn btn-success btn-sm py-0 px-1" title="Agregar Fila"><i class="fas fa-plus"></i></button></th></tr></thead>
-                        <tbody id="detalleEquiposBody">
-                            <?php /* Las filas se generan en JS desde equiposContrato (crear/editar) */ ?>
-                        </tbody>
-                    </table>
+                    <div class="card bg-light border shadow-sm mb-3 mt-4">
+                        <div class="card-body py-3">
+                            <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+                                <div>
+                                    <h5 class="mb-1">Líneas de equipo del contrato</h5>
+                                    <p class="small text-muted mb-0">Añada todas las líneas que necesite. Cada fila es un ítem distinto (mismo equipo puede repetirse con otra marca o precio). Si no encuentra un equipo en la lista, puede <strong>añadirlo al catálogo</strong> sin salir del formulario.</p>
+                                </div>
+                                <div class="d-flex flex-wrap gap-2 shrink-0">
+                                    <button type="button" id="btnCatalogoNuevoEquipo" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#modalCatalogoEquipo" <?= empty($tipos_equipo_catalogo) ? 'disabled title="No hay tipos de equipo definidos"' : '' ?>>
+                                        <i class="fas fa-book-medical me-1"></i>Añadir equipo al catálogo
+                                    </button>
+                                    <button type="button" id="btnAgregarEquipo" class="btn btn-success">
+                                        <i class="fas fa-plus-circle me-1"></i>Agregar línea de equipo
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-hover table-bordered align-middle table-sm">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th style="min-width:220px">Equipo</th>
+                                    <th style="min-width:100px">Marca</th>
+                                    <th style="width:100px">Cantidad</th>
+                                    <th style="min-width:110px">Precio unitario</th>
+                                    <th class="text-center" style="width:56px" title="Quitar fila"><i class="fas fa-trash-alt text-white-50"></i></th>
+                                </tr>
+                            </thead>
+                            <tbody id="detalleEquiposBody">
+                                <?php /* Filas desde JS (equiposContrato / nueva fila) */ ?>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
@@ -162,7 +192,7 @@ $fuentes = $ffModel->leerTodos();
             </div>
             <div class="alert alert-light border small py-2 mb-3">
                 <i class="fas fa-info-circle text-primary me-1"></i>
-                Use <strong>Asignar nueva entrega</strong> para abrir un asistente en ventana; al confirmar, la entrega se añade a esta lista. Las cantidades parten de las líneas de <strong>Detalles y equipos</strong>.
+                <strong>Asignar nueva entrega</strong> abre un asistente. La tabla resume los centros asignados; use <strong>Detalles</strong> para editar cantidades y datos. Guarde el contrato al final.
             </div>
             <select id="centros_educativos_hidden" style="display: none;">
             <option value="">Seleccione...</option>
@@ -171,10 +201,78 @@ $fuentes = $ffModel->leerTodos();
             <?php endforeach; ?>
             </select>
 
-            <div class="accordion" id="contenedorEntregas"></div>
+            <?php
+            $listaEntregasVista = isset($contrato['entregas']) && is_array($contrato['entregas']) ? $contrato['entregas'] : [];
+            $nEntregasVista = count($listaEntregasVista);
+            $mapaCentroEtiqueta = [];
+            foreach ($centros as $c) {
+                if (!isset($c['centro_id'])) {
+                    continue;
+                }
+                $mapaCentroEtiqueta[(string) $c['centro_id']] = trim(($c['codigo_infraestructura'] ?? '') . ' ' . ($c['nombre_ce'] ?? ''));
+            }
+            ?>
+
+            <div class="card border shadow-sm mb-3" id="cardTablaEntregas">
+                <div class="card-header py-2 d-flex justify-content-between align-items-center">
+                    <span class="fw-semibold"><i class="fas fa-list me-2 text-primary"></i>Centros con entrega registrada</span>
+                    <span class="badge bg-secondary" id="badgeNumEntregas"><?= (int) $nEntregasVista ?></span>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover mb-0 align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>#</th>
+                                    <th>Centro educativo</th>
+                                    <th>Fecha</th>
+                                    <th>Estado</th>
+                                    <th class="text-end" style="min-width:200px">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tablaResumenEntregasBody">
+                                <?php if ($nEntregasVista > 0): ?>
+                                    <?php $idxEnt = 0; ?>
+                                    <?php foreach ($listaEntregasVista as $ent): ?>
+                                        <?php
+                                        $idxEnt += 1;
+                                        $eidRaw = $ent['id_entrega'] ?? '';
+                                        $eidAttr = htmlspecialchars((string) $eidRaw, ENT_QUOTES, 'UTF-8');
+                                        $idInst = $ent['id_institucion'] ?? '';
+                                        $kInst = (string) $idInst;
+                                        $txtCentro = $mapaCentroEtiqueta[$kInst] ?? ('ID ' . $kInst);
+                                        $fechaEnt = !empty($ent['fecha_entrega']) ? htmlspecialchars(substr((string) $ent['fecha_entrega'], 0, 10), ENT_QUOTES, 'UTF-8') : '—';
+                                        $estadoEnt = htmlspecialchars((string) ($ent['estado'] ?? '—'), ENT_QUOTES, 'UTF-8');
+                                        $badgeEst = (($ent['estado'] ?? '') === 'Entregado') ? 'bg-success' : 'bg-info text-dark';
+                                        ?>
+                                        <tr>
+                                            <td><?= (int) $idxEnt ?></td>
+                                            <td><?= htmlspecialchars($txtCentro, ENT_QUOTES, 'UTF-8') ?></td>
+                                            <td><?= $fechaEnt ?></td>
+                                            <td><span class="badge <?= $badgeEst ?>"><?= $estadoEnt ?></span></td>
+                                            <td class="text-end text-nowrap">
+                                                <button type="button" class="btn btn-sm btn-outline-primary btn-detalle-entrega" data-entrega-id="<?= $eidAttr ?>"><i class="fas fa-edit me-1"></i>Detalles</button>
+                                                <?php if ($eidRaw !== '' && is_numeric($eidRaw) && (int) $eidRaw > 0): ?>
+                                                    <a class="btn btn-sm btn-outline-secondary" href="acta_entrega_pdf.php?id_entrega=<?= (int) $eidRaw ?>" target="_blank" rel="noopener" title="Acta de recepción (PDF)"><i class="fas fa-file-pdf"></i></a>
+                                                <?php endif; ?>
+                                                <button type="button" class="btn btn-sm btn-outline-danger btn-quitar-entrega-resumen" data-entrega-id="<?= $eidAttr ?>" title="Quitar esta entrega del borrador"><i class="fas fa-times"></i></button>
+                                            </td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                <?php endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="text-muted small text-center py-4 mb-0 <?= $nEntregasVista > 0 ? 'd-none' : '' ?>" id="tablaEntregasVacia">No hay entregas aún. Use el botón verde superior.</p>
+                </div>
+            </div>
+
+            <div id="entregasHiddenFields" class="d-none" aria-hidden="true"></div>
         </div>
     </div>
 </div>
+
+    </div><!-- /#contratoTabsContent -->
 
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-4 pt-3 border-top">
         <a href="gestion_contratos.php" class="btn btn-outline-secondary"><i class="fas fa-arrow-left me-1"></i>Volver al listado</a>
@@ -193,7 +291,9 @@ $fuentes = $ffModel->leerTodos();
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
             </div>
             <div class="modal-body">
-                <p class="small text-muted">Complete los datos y las cantidades; luego pulse <strong>Agregar a la lista</strong>. Podrá revisar y guardar el contrato al final.</p>
+                <input type="hidden" id="modal_entrega_modo" value="nueva" autocomplete="off">
+                <input type="hidden" id="modal_entrega_editando_id" value="" autocomplete="off">
+                <p class="small text-muted" id="modalEntregaIntro">Complete los datos y las cantidades; confirme para añadir la entrega al resumen. Guarde el contrato al final.</p>
                 <div class="mb-3">
                     <label for="modal_entrega_institucion" class="form-label">Centro educativo <span class="text-danger">*</span></label>
                     <select id="modal_entrega_institucion" class="form-select" required>
@@ -237,21 +337,99 @@ $fuentes = $ffModel->leerTodos();
                     <i class="fas fa-exclamation-triangle me-1"></i>No hay líneas de equipo en el contrato. Agregue equipos en la pestaña <strong>Detalles y equipos</strong>.
                 </p>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <button type="button" class="btn btn-success" id="btnModalConfirmarEntrega">
-                    <i class="fas fa-check me-1"></i>Agregar a la lista de entregas
-                </button>
+            <div class="modal-footer flex-wrap gap-2">
+                <a href="#" class="btn btn-outline-secondary d-none" id="btnActaRecepcionPdf" target="_blank" rel="noopener">
+                    <i class="fas fa-file-pdf me-1"></i>Acta de recepción (PDF)
+                </a>
+                <div class="ms-auto d-flex flex-wrap gap-2">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-success" id="btnModalConfirmarEntrega">
+                        <i class="fas fa-check me-1"></i><span id="btnModalConfirmarEntregaTexto">Agregar a la lista</span>
+                    </button>
+                </div>
             </div>
         </div>
     </div>
 </div>
 
+<!-- Modal: alta rápida de equipo en catálogo (desde líneas del contrato) -->
+<div class="modal fade" id="modalCatalogoEquipo" tabindex="-1" aria-labelledby="modalCatalogoEquipoTitulo" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="modalCatalogoEquipoTitulo"><i class="fas fa-book-medical me-2"></i>Añadir equipo al catálogo</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <form id="formCatalogoEquipo" novalidate>
+                <div class="modal-body">
+                    <p class="small text-muted">El equipo quedará guardado y aparecerá en el desplegable <strong>Equipo</strong> de todas las líneas de este contrato.</p>
+                    <div class="mb-3">
+                        <label for="catalogo_equipo_nombre" class="form-label">Nombre del equipo <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="catalogo_equipo_nombre" name="nombre_equipo" required maxlength="255" autocomplete="off" placeholder="Ej. Placas Optas">
+                    </div>
+                    <div class="mb-3">
+                        <label for="catalogo_equipo_codigo" class="form-label">Código (opcional)</label>
+                        <input type="text" class="form-control" id="catalogo_equipo_codigo" name="codigo_equipo" maxlength="80" autocomplete="off" placeholder="Si lo deja vacío se genera uno automático">
+                    </div>
+                    <div class="mb-0">
+                        <label for="catalogo_equipo_tipo" class="form-label">Tipo de equipo <span class="text-danger">*</span></label>
+                        <select class="form-select" id="catalogo_equipo_tipo" name="id_tipo_equipo" required <?= empty($tipos_equipo_catalogo) ? 'disabled' : '' ?>>
+                            <option value="">Seleccione…</option>
+                            <?php foreach ($tipos_equipo_catalogo as $tipo): ?>
+                                <option value="<?= (int) ($tipo['id_tipo_equipo'] ?? 0) ?>">
+                                    <?= htmlspecialchars((string) ($tipo['nombre_tipo_equipo'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary" id="btnGuardarCatalogoEquipo">
+                        <i class="fas fa-save me-1"></i>Guardar y añadir a la lista
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<?php
+$jsonFlags = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS;
+if (defined('JSON_INVALID_UTF8_SUBSTITUTE')) {
+    $jsonFlags |= JSON_INVALID_UTF8_SUBSTITUTE;
+}
+$jsonContrato = static function ($data) use ($jsonFlags) {
+    $j = json_encode($data, $jsonFlags);
+    if ($j === false) {
+        error_log('json_encode (contrato formulario): ' . json_last_error_msg());
+        return '[]';
+    }
+    return $j;
+};
+?>
+<script type="application/json" id="entregas-contrato-data"><?= $jsonContrato($contrato['entregas'] ?? []) ?></script>
+<script>
+(function () {
+    window.entregasContrato = [];
+    var el = document.getElementById('entregas-contrato-data');
+    if (el && el.textContent) {
+        try {
+            window.entregasContrato = JSON.parse(el.textContent);
+        } catch (e) {
+            window.entregasContrato = [];
+        }
+    }
+    if (!Array.isArray(window.entregasContrato)) {
+        window.entregasContrato = [];
+    }
+})();
+</script>
 <script>
     const modoFormulario = '<?= $modo ?>';
-    const equiposContrato = <?= json_encode($contrato['equipos'] ?? []) ?>;
-    const equiposDisponibles = <?= json_encode($equipos ?? []) ?>;
-    const entregasContrato = <?= json_encode($contrato['entregas'] ?? []) ?>; // <-- AÑADE ESTA LÍNEA
+    const equiposContrato = <?= $jsonContrato($contrato['equipos'] ?? []) ?>;
+    const equiposDisponibles = <?= $jsonContrato($equipos ?? []) ?>;
+    window.URL_AJAX_EQUIPOS = '../app/ajax/equipos_ajax.php';
 </script>
 
 <?php 
