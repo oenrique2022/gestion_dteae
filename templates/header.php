@@ -29,6 +29,7 @@ require_once __DIR__ . '/../app/includes/config.php'; ?>
                 <li class="nav-item"><a class="nav-link" href="gestion_proveedores.php">Proveedores</a></li>
                 <li class="nav-item"><a class="nav-link" href="#">Catálogos</a></li>
                 <li class="nav-item"><a class="nav-link" href="gestion_contratos.php">Contratos</a></li>
+                <li class="nav-item"><a class="nav-link" href="reportes.php">Reportes</a></li>
             </ul>
             <ul class="navbar-nav">
                 <li class="nav-item dropdown">

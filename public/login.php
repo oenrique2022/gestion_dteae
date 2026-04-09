@@ -27,7 +27,7 @@ require_once __DIR__ . '/../app/includes/config.php';
         <div class="card login-card shadow-lg">
             <div class="card-body">
                 <h3 class="card-title text-center mb-4">
-                    <i class="fas fa-file-signature text-primary me-2"></i><?= APP_NAME ?>
+                    <i class="fas fa-file-signature text-primary me-2"></i><?= APP_NAME ?> 
                 </h3>
                 <form id="loginForm" novalidate>
                     <div class="mb-3">
