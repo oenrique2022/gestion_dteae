@@ -132,8 +132,9 @@ $(document).ready(function () {
         });
 
         const esNueva = !entrega;
-        const btnCollapsed = esNueva ? '' : 'collapsed';
-        const collapseClasses = esNueva ? 'accordion-collapse collapse show' : 'accordion-collapse collapse';
+        const expandirPanel = esNueva || !!(entrega && entrega.desdeModal);
+        const btnCollapsed = expandirPanel ? '' : 'collapsed';
+        const collapseClasses = expandirPanel ? 'accordion-collapse collapse show' : 'accordion-collapse collapse';
 
         const nuevoBloqueHTML = `
             <div class="accordion-item" id="entrega-${entregaId}">
@@ -186,46 +187,156 @@ $(document).ready(function () {
 
     btnAgregarEquipo.on('click', () => crearFilaEquipo());
 
+    const modalNuevaEntregaEl = document.getElementById('modalNuevaEntrega');
+
+    const abrirModalNuevaEntrega = function () {
+        const tb = $('#modalNuevaEntregaEquipos');
+        tb.empty();
+        const sinMsg = $('#modalNuevaEntregaSinEquipos');
+        const btnOk = $('#btnModalConfirmarEntrega');
+        let tieneLineas = false;
+
+        $('.fila-equipo-item').each(function () {
+            const fila = $(this);
+            const selectEquipo = fila.find('select');
+            const equipoId = selectEquipo.val();
+            if (!equipoId) return;
+            tieneLineas = true;
+            const equipoTexto = $('<div>').text(selectEquipo.find('option:selected').text()).html();
+            const cantidadTotal = fila.find('input[name*="[cantidad]"]').val();
+            tb.append(
+                `<tr data-equipo-id="${equipoId}">
+                    <td>${equipoTexto}</td>
+                    <td><span class="badge bg-secondary">${cantidadTotal}</span></td>
+                    <td style="max-width:120px"><input type="number" class="form-control form-control-sm input-modal-cant-entrega" min="0" max="${cantidadTotal}" value="0"></td>
+                </tr>`
+            );
+        });
+
+        if (!tieneLineas) {
+            sinMsg.removeClass('d-none');
+            btnOk.prop('disabled', true);
+        } else {
+            sinMsg.addClass('d-none');
+            btnOk.prop('disabled', false);
+        }
+
+        $('#modal_entrega_fecha').val('');
+        $('#modal_entrega_firma').val('');
+        $('#modal_entrega_estado').val('En proceso');
+        $('#modal_entrega_comentarios').val('');
+
+        const $inst = $('#modal_entrega_institucion');
+        if ($inst.hasClass('select2-hidden-accessible')) {
+            $inst.select2('destroy');
+        }
+        $inst.val('');
+
+        if (modalNuevaEntregaEl && window.bootstrap && window.bootstrap.Modal) {
+            window.bootstrap.Modal.getOrCreateInstance(modalNuevaEntregaEl).show();
+        }
+
+        setTimeout(() => {
+            if (!$inst.hasClass('select2-hidden-accessible')) {
+                $inst.select2({
+                    theme: 'bootstrap-5',
+                    placeholder: 'Buscar centro educativo…',
+                    width: '100%',
+                    dropdownParent: $('#modalNuevaEntrega'),
+                    allowClear: true
+                });
+            }
+        }, 300);
+    };
+
+    if (modalNuevaEntregaEl) {
+        modalNuevaEntregaEl.addEventListener('hidden.bs.modal', function () {
+            const $inst = $('#modal_entrega_institucion');
+            if ($inst.hasClass('select2-hidden-accessible')) {
+                $inst.select2('destroy');
+            }
+        });
+    }
+
+    $('#btnModalConfirmarEntrega').on('click', function () {
+        const idInst = $('#modal_entrega_institucion').val();
+        if (!idInst) {
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({ icon: 'warning', title: 'Seleccione un centro educativo', text: 'Debe elegir la institución que recibirá la entrega.' });
+            } else {
+                window.alert('Seleccione un centro educativo.');
+            }
+            return;
+        }
+
+        const detalle = [];
+        $('#modalNuevaEntregaEquipos tr').each(function () {
+            const equipoId = $(this).data('equipo-id');
+            const cant = parseInt($(this).find('.input-modal-cant-entrega').val(), 10) || 0;
+            detalle.push({ id_equipo: equipoId, cantidad: cant });
+        });
+
+        const entregaId = Date.now();
+        const entrega = {
+            id_entrega: entregaId,
+            id_institucion: idInst,
+            fecha_entrega: $('#modal_entrega_fecha').val() || null,
+            firma_responsable: $('#modal_entrega_firma').val() || '',
+            estado: $('#modal_entrega_estado').val() || 'En proceso',
+            comentarios: $('#modal_entrega_comentarios').val() || '',
+            detalle: detalle,
+            desdeModal: true
+        };
+
+        const $inst = $('#modal_entrega_institucion');
+        if ($inst.hasClass('select2-hidden-accessible')) {
+            $inst.select2('destroy');
+        }
+        if (modalNuevaEntregaEl && window.bootstrap && window.bootstrap.Modal) {
+            window.bootstrap.Modal.getOrCreateInstance(modalNuevaEntregaEl).hide();
+        }
+
+        cuandoPestanaEntregasVisible(() => {
+            crearBloqueEntrega(entrega);
+            initSelect2Entregas();
+            const agregado = document.getElementById('entrega-' + entregaId);
+            if (agregado) {
+                agregado.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+        });
+    });
+
     const clickAsignarEntrega = function () {
         const filasEq = $('.fila-equipo-item').length;
         if (filasEq === 0) {
-            const continuarSinLineas = () => {
-                cuandoPestanaEntregasVisible(() => {
-                    crearBloqueEntrega(null);
-                    initSelect2Entregas();
-                });
-            };
+            const abrirModal = () => abrirModalNuevaEntrega();
             if (typeof Swal === 'undefined') {
-                if (window.confirm('No hay líneas de equipo. ¿Ir a la pestaña Detalles para agregarlas?')) {
+                if (window.confirm('No hay líneas de equipo. ¿Ir a Detalles?')) {
                     abrirPestanaDetalles();
                 } else {
-                    continuarSinLineas();
+                    abrirModal();
                 }
                 return;
             }
             Swal.fire({
                 icon: 'info',
                 title: 'Líneas de equipo',
-                html: 'Para asignar cantidades por centro, primero agregue al menos una <strong>línea de equipo</strong> en la pestaña <strong>1. Detalles y Líneas</strong>.',
+                html: 'Para asignar cantidades por centro, agregue al menos una <strong>línea de equipo</strong> en <strong>Detalles y equipos</strong>.',
                 showCancelButton: true,
                 confirmButtonText: 'Ir a Detalles',
-                cancelButtonText: 'Continuar igual',
+                cancelButtonText: 'Abrir asistente igual',
                 reverseButtons: true
             }).then((r) => {
                 if (r.isConfirmed) {
                     abrirPestanaDetalles();
-                }
-                if (!r.isConfirmed) {
-                    continuarSinLineas();
+                } else {
+                    abrirModal();
                 }
             });
             return;
         }
 
-        cuandoPestanaEntregasVisible(() => {
-            crearBloqueEntrega(null);
-            initSelect2Entregas();
-        });
+        abrirModalNuevaEntrega();
     };
 
     // Delegación: el botón está en una pestaña oculta a veces; evita fallos de binding directo

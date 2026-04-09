@@ -162,7 +162,7 @@ $fuentes = $ffModel->leerTodos();
             </div>
             <div class="alert alert-light border small py-2 mb-3">
                 <i class="fas fa-info-circle text-primary me-1"></i>
-                Cada entrega corresponde a un centro educativo. Indique cantidades por equipo según las líneas definidas en <strong>Detalles y equipos</strong>.
+                Use <strong>Asignar nueva entrega</strong> para abrir un asistente en ventana; al confirmar, la entrega se añade a esta lista. Las cantidades parten de las líneas de <strong>Detalles y equipos</strong>.
             </div>
             <select id="centros_educativos_hidden" style="display: none;">
             <option value="">Seleccione...</option>
@@ -183,6 +183,69 @@ $fuentes = $ffModel->leerTodos();
         </div>
     </div>
 </form>
+
+<!-- Modal: nueva entrega (flujo centrado; al confirmar se añade al listado de la pestaña Entregas) -->
+<div class="modal fade" id="modalNuevaEntrega" tabindex="-1" aria-labelledby="modalNuevaEntregaTitulo" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title" id="modalNuevaEntregaTitulo"><i class="fas fa-truck me-2"></i>Nueva entrega por centro</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                <p class="small text-muted">Complete los datos y las cantidades; luego pulse <strong>Agregar a la lista</strong>. Podrá revisar y guardar el contrato al final.</p>
+                <div class="mb-3">
+                    <label for="modal_entrega_institucion" class="form-label">Centro educativo <span class="text-danger">*</span></label>
+                    <select id="modal_entrega_institucion" class="form-select" required>
+                        <option value="">Seleccione un centro…</option>
+                        <?php foreach ($centros as $centro): ?>
+                            <option value="<?= htmlspecialchars((string)$centro['centro_id']) ?>"><?= htmlspecialchars($centro['codigo_infraestructura'] . ' ' . $centro['nombre_ce']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="row g-2 mb-3">
+                    <div class="col-md-4">
+                        <label for="modal_entrega_fecha" class="form-label">Fecha de entrega</label>
+                        <input type="date" id="modal_entrega_fecha" class="form-control form-control-sm">
+                    </div>
+                    <div class="col-md-4">
+                        <label for="modal_entrega_firma" class="form-label">Persona que firma</label>
+                        <input type="text" id="modal_entrega_firma" class="form-control form-control-sm" placeholder="Opcional">
+                    </div>
+                    <div class="col-md-4">
+                        <label for="modal_entrega_estado" class="form-label">Estado</label>
+                        <select id="modal_entrega_estado" class="form-select form-select-sm">
+                            <option value="En proceso">En proceso</option>
+                            <option value="Entregado">Entregado</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label for="modal_entrega_comentarios" class="form-label">Comentarios</label>
+                    <textarea id="modal_entrega_comentarios" class="form-control form-control-sm" rows="2" placeholder="Opcional"></textarea>
+                </div>
+                <h6 class="border-bottom pb-2">Cantidades por equipo (según líneas del contrato)</h6>
+                <div class="table-responsive">
+                    <table class="table table-sm table-bordered align-middle">
+                        <thead class="table-light">
+                            <tr><th>Equipo</th><th>Cant. en contrato</th><th>Cant. a entregar</th></tr>
+                        </thead>
+                        <tbody id="modalNuevaEntregaEquipos"></tbody>
+                    </table>
+                </div>
+                <p id="modalNuevaEntregaSinEquipos" class="text-warning small d-none mb-0">
+                    <i class="fas fa-exclamation-triangle me-1"></i>No hay líneas de equipo en el contrato. Agregue equipos en la pestaña <strong>Detalles y equipos</strong>.
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-success" id="btnModalConfirmarEntrega">
+                    <i class="fas fa-check me-1"></i>Agregar a la lista de entregas
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 
 <script>
     const modoFormulario = '<?= $modo ?>';
