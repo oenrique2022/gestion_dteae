@@ -76,13 +76,19 @@
     const getFiltrosTerritorio = () => {
         const departamentoId = document.getElementById('filtroDepartamentoDash')?.value || '';
         const municipioId = document.getElementById('filtroMunicipioDash')?.value || '';
-        return { departamentoId, municipioId };
+        const fuenteFinanciamientoId = document.getElementById('filtroFuenteFinanciamientoDash')?.value || '';
+        return { departamentoId, municipioId, fuenteFinanciamientoId };
     };
 
-    const poblarSelect = (selectEl, items, valueField = 'value', labelField = 'label') => {
+    const poblarSelect = (selectEl, items, valueField = 'value', labelField = 'label', emptyLabel = 'Todos') => {
         if (!selectEl) return;
         const valueActual = selectEl.value;
-        selectEl.innerHTML = '<option value="">Todos</option>';
+        const escOpt = (s) => {
+            const d = document.createElement('div');
+            d.textContent = s == null ? '' : String(s);
+            return d.innerHTML;
+        };
+        selectEl.innerHTML = `<option value="">${escOpt(emptyLabel)}</option>`;
         (items || []).forEach((item) => {
             const opt = document.createElement('option');
             if (typeof item === 'object' && item !== null) {
@@ -111,6 +117,7 @@
     const cargarFiltrosTerritoriales = () => {
         const depEl = document.getElementById('filtroDepartamentoDash');
         const munEl = document.getElementById('filtroMunicipioDash');
+        const fuenteEl = document.getElementById('filtroFuenteFinanciamientoDash');
         if (!depEl || !munEl) return Promise.resolve();
 
         return fetch('../app/ajax/reportes_ajax.php?action=filtros_territorio')
@@ -121,12 +128,16 @@
                 municipiosPorDepartamento = data.municipios_por_departamento || {};
                 poblarSelect(depEl, data.departamentos || [], 'id', 'nombre');
                 actualizarMunicipiosPorDepartamento();
+                if (fuenteEl) {
+                    poblarSelect(fuenteEl, data.fuentes_financiamiento || [], 'id', 'nombre', 'Todas');
+                }
             })
             .catch(() => {
                 municipiosPorDepartamento = {};
                 poblarSelect(depEl, []);
                 poblarSelect(munEl, []);
                 munEl.disabled = true;
+                if (fuenteEl) poblarSelect(fuenteEl, []);
             });
     };
 
@@ -152,7 +163,7 @@
 
         window.bootstrap.Modal.getOrCreateInstance(modalEl).show();
 
-        const url = `../app/ajax/reportes_ajax.php?action=centros_por_producto&id_equipo=${encodeURIComponent(idEquipo)}&fecha_desde=${encodeURIComponent(desde)}&fecha_hasta=${encodeURIComponent(hasta)}&departamento_id=${encodeURIComponent(filtros.departamentoId)}&municipio_id=${encodeURIComponent(filtros.municipioId)}`;
+        const url = `../app/ajax/reportes_ajax.php?action=centros_por_producto&id_equipo=${encodeURIComponent(idEquipo)}&fecha_desde=${encodeURIComponent(desde)}&fecha_hasta=${encodeURIComponent(hasta)}&departamento_id=${encodeURIComponent(filtros.departamentoId)}&municipio_id=${encodeURIComponent(filtros.municipioId)}&fuente_financiamiento_id=${encodeURIComponent(filtros.fuenteFinanciamientoId)}`;
 
         fetch(url)
             .then((r) => r.json())
@@ -354,7 +365,7 @@
         if (!desde || !hasta) return;
 
         mostrarErrorRutas('');
-        const url = `../app/ajax/reportes_ajax.php?action=calendarizacion_rutas&fecha_desde=${encodeURIComponent(desde)}&fecha_hasta=${encodeURIComponent(hasta)}&departamento_id=${encodeURIComponent(filtros.departamentoId)}&municipio_id=${encodeURIComponent(filtros.municipioId)}`;
+        const url = `../app/ajax/reportes_ajax.php?action=calendarizacion_rutas&fecha_desde=${encodeURIComponent(desde)}&fecha_hasta=${encodeURIComponent(hasta)}&departamento_id=${encodeURIComponent(filtros.departamentoId)}&municipio_id=${encodeURIComponent(filtros.municipioId)}&fuente_financiamiento_id=${encodeURIComponent(filtros.fuenteFinanciamientoId)}`;
 
         fetch(url)
             .then((r) => r.json())
@@ -379,7 +390,7 @@
         if (!desde || !hasta) return;
 
         mostrarError('');
-        const url = `../app/ajax/reportes_ajax.php?action=resumen_gerencial&fecha_desde=${encodeURIComponent(desde)}&fecha_hasta=${encodeURIComponent(hasta)}&departamento_id=${encodeURIComponent(filtros.departamentoId)}&municipio_id=${encodeURIComponent(filtros.municipioId)}`;
+        const url = `../app/ajax/reportes_ajax.php?action=resumen_gerencial&fecha_desde=${encodeURIComponent(desde)}&fecha_hasta=${encodeURIComponent(hasta)}&departamento_id=${encodeURIComponent(filtros.departamentoId)}&municipio_id=${encodeURIComponent(filtros.municipioId)}&fuente_financiamiento_id=${encodeURIComponent(filtros.fuenteFinanciamientoId)}`;
 
         fetch(url)
             .then((r) => r.json())
@@ -426,6 +437,7 @@
             cargar();
         });
         document.getElementById('filtroMunicipioDash')?.addEventListener('change', cargar);
+        document.getElementById('filtroFuenteFinanciamientoDash')?.addEventListener('change', cargar);
 
         document.querySelectorAll('[data-preset]').forEach((btn) => {
             btn.addEventListener('click', function () {

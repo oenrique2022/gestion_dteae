@@ -303,6 +303,8 @@ $(document).ready(function () {
             <tr id="fila-equipo-${rowId}" class="fila-equipo-item">
                 <td><select name="equipos[${rowId}][id]" class="form-select form-select-sm" required>${opciones}</select></td>
                 <td><input type="text" name="equipos[${rowId}][marca]" class="form-control form-control-sm" value="${item ? (item.marca || '') : ''}" required></td>
+                <td><input type="text" name="equipos[${rowId}][modelo]" class="form-control form-control-sm" value="${item ? (item.modelo || '') : ''}"></td>
+                <td><input type="text" name="equipos[${rowId}][descripcion]" class="form-control form-control-sm" value="${item ? (item.descripcion || '') : ''}"></td>
                 <td><input type="number" name="equipos[${rowId}][cantidad]" class="form-control form-control-sm" value="${item ? (item.cantidad || '1') : '1'}" min="1" required></td>
                 <td><input type="number" step="0.01" name="equipos[${rowId}][precio]" class="form-control form-control-sm" value="${item ? (item.precio || '') : ''}" min="0" required></td>
                 <td><button type="button" class="btn btn-danger btn-sm py-0 px-2 btn-remover-fila">X</button></td>

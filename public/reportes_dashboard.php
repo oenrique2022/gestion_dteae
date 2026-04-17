@@ -37,6 +37,12 @@
                     <option value="">Todos</option>
                 </select>
             </div>
+            <div class="col-12 col-md-3 col-lg-2">
+                <label for="filtroFuenteFinanciamientoDash" class="form-label small text-muted mb-0">Fuente de financiamiento</label>
+                <select class="form-select form-select-sm" id="filtroFuenteFinanciamientoDash">
+                    <option value="">Todas</option>
+                </select>
+            </div>
             <div class="col-12 col-md-auto d-flex flex-wrap gap-2">
                 <button type="button" class="btn btn-primary btn-sm" id="btnAplicarRango">
                     <i class="fas fa-filter me-1"></i>Aplicar

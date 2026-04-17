@@ -9,6 +9,12 @@ document.addEventListener('DOMContentLoaded', function() {
     const equipoForm = document.getElementById('equipoForm');
     const equipoModalTitle = document.getElementById('equipoModalTitle');
 
+    const fmtFechaTabla = (v) => {
+        if (v == null || String(v).trim() === '') return '—';
+        const s = String(v);
+        return s.length >= 10 ? s.substring(0, 10) : s;
+    };
+
     const cargarEquipos = () => {
         fetch('../app/ajax/equipos_ajax.php?action=listar')
             .then(response => response.json())
@@ -17,14 +23,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (data.success && data.data.length > 0) {
                     data.data.forEach(equipo => {
                         const isChecked = equipo.activo == 1 ? 'checked' : '';
+                        const estadoInv = equipo.estado != null && String(equipo.estado).trim() !== '' ? equipo.estado : '—';
                         tablaEquiposBody.innerHTML += `
                             <tr>
                                 <td>${equipo.codigo_equipo}</td>
                                 <td>${equipo.nombre_equipo}</td>
                                 <td>${equipo.nombre_tipo_equipo}</td>
+                                <td>${estadoInv}</td>
+                                <td>${fmtFechaTabla(equipo.fecha_adquisicion)}</td>
                                 <td class="text-center">
                                     <div class="form-check form-switch d-inline-block">
-                                        <input class="form-check-input estado-switch" type="checkbox" role="switch" data-id="${equipo.id_equipo}" ${isChecked}>
+                                        <input class="form-check-input estado-switch" type="checkbox" role="switch" data-id="${equipo.id_equipo}" ${isChecked} title="Activo en catálogo">
                                     </div>
                                 </td>
                                 <td class="text-end">
@@ -35,7 +44,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         `;
                     });
                 } else {
-                    tablaEquiposBody.innerHTML = '<tr><td colspan="5" class="text-center">No hay equipos registrados.</td></tr>';
+                    tablaEquiposBody.innerHTML = '<tr><td colspan="7" class="text-center">No hay equipos registrados.</td></tr>';
                 }
             });
     };
@@ -47,6 +56,8 @@ document.addEventListener('DOMContentLoaded', function() {
             if (!puedeEscribir) return;
             equipoForm.reset();
             document.getElementById('id_equipo').value = '';
+            document.getElementById('estado_inventario').value = 'En inventario';
+            document.getElementById('fecha_adquisicion').value = '';
             equipoModalTitle.textContent = 'Nuevo Equipo';
             equipoModal.show();
         });
@@ -89,7 +100,21 @@ document.addEventListener('DOMContentLoaded', function() {
                         document.getElementById('codigo_equipo').value = eq.codigo_equipo;
                         document.getElementById('nombre_equipo').value = eq.nombre_equipo;
                         document.getElementById('id_tipo_equipo').value = eq.id_tipo_equipo;
-                        document.getElementById('descripcion').value = eq.descripcion;
+                        document.getElementById('descripcion').value = eq.descripcion || '';
+                        const selEst = document.getElementById('estado_inventario');
+                        const ev = eq.estado != null ? String(eq.estado).trim() : 'En inventario';
+                        if (Array.from(selEst.options).some((o) => o.value === ev)) {
+                            selEst.value = ev;
+                        } else if (ev) {
+                            const opt = document.createElement('option');
+                            opt.value = ev;
+                            opt.textContent = ev;
+                            selEst.appendChild(opt);
+                            selEst.value = ev;
+                        }
+                        const fa = eq.fecha_adquisicion;
+                        document.getElementById('fecha_adquisicion').value =
+                            fa != null && String(fa).trim() !== '' ? String(fa).substring(0, 10) : '';
                         equipoModalTitle.textContent = 'Editar Equipo';
                         equipoModal.show();
                     }

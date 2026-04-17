@@ -161,15 +161,27 @@ class Reporte {
                 ];
             }
 
+            $fuentes = [];
+            try {
+                $sqlFf = 'SELECT id, nombre FROM fuentes_financiamiento WHERE activo = 1 ORDER BY nombre ASC';
+                $stFf = $this->conn->prepare($sqlFf);
+                $stFf->execute();
+                $fuentes = $stFf->fetchAll(PDO::FETCH_ASSOC);
+            } catch (PDOException $e) {
+                error_log($e->getMessage());
+            }
+
             return [
                 'departamentos' => $departamentos,
                 'municipios_por_departamento' => $municipiosPorDepartamento,
+                'fuentes_financiamiento' => $fuentes,
             ];
         } catch (PDOException $e) {
             error_log($e->getMessage());
             return [
                 'departamentos' => [],
                 'municipios_por_departamento' => [],
+                'fuentes_financiamiento' => [],
             ];
         }
     }
@@ -188,14 +200,29 @@ class Reporte {
         return ['sql' => $sql, 'params' => $params];
     }
 
+    /** Filtro por fuente de financiamiento del contrato (alias de tabla c). */
+    private function construirFiltroFuenteFinanciamiento(int $fuenteId = 0): array {
+        if ($fuenteId <= 0) {
+            return ['sql' => '', 'params' => []];
+        }
+        return [
+            'sql' => ' AND c.fuente_financiamiento_id = :fuente_ff',
+            'params' => [':fuente_ff' => $fuenteId],
+        ];
+    }
+
     /**
      * Resumen gerencial: métricas y desgloses filtrados por fecha de entrega (inclusive).
      * Solo se consideran entregas con fecha_entrega no nula.
      */
-    public function resumenGerencial(string $fechaDesde, string $fechaHasta, int $departamentoId = 0, int $municipioId = 0): array {
+    public function resumenGerencial(string $fechaDesde, string $fechaHasta, int $departamentoId = 0, int $municipioId = 0, int $fuenteFinanciamientoId = 0): array {
         $vacio = [
             'rango' => ['desde' => $fechaDesde, 'hasta' => $fechaHasta],
-            'filtros' => ['departamento_id' => $departamentoId, 'municipio_id' => $municipioId],
+            'filtros' => [
+                'departamento_id' => $departamentoId,
+                'municipio_id' => $municipioId,
+                'fuente_financiamiento_id' => $fuenteFinanciamientoId,
+            ],
             'kpis' => [
                 'total_entregas' => 0,
                 'total_unidades' => 0,
@@ -210,14 +237,20 @@ class Reporte {
         try {
             $rango = 'e.fecha_entrega IS NOT NULL AND DATE(e.fecha_entrega) BETWEEN :desde AND :hasta';
             $filtroTerritorial = $this->construirFiltroTerritorial($departamentoId, $municipioId);
-            $whereBase = "{$rango}{$filtroTerritorial['sql']}";
-            $params = array_merge([':desde' => $fechaDesde, ':hasta' => $fechaHasta], $filtroTerritorial['params']);
+            $filtroFuente = $this->construirFiltroFuenteFinanciamiento($fuenteFinanciamientoId);
+            $whereBase = "{$rango}{$filtroTerritorial['sql']}{$filtroFuente['sql']}";
+            $params = array_merge(
+                [':desde' => $fechaDesde, ':hasta' => $fechaHasta],
+                $filtroTerritorial['params'],
+                $filtroFuente['params']
+            );
 
             $sqlKpi = "SELECT 
                             COUNT(DISTINCT e.id_entrega) AS total_entregas,
                             COUNT(DISTINCT e.id_institucion) AS centros_unicos,
                             COUNT(DISTINCT e.id_contrato) AS contratos_unicos
                        FROM entregas e
+                       INNER JOIN contratos c ON e.id_contrato = c.id
                        LEFT JOIN centros_educativos ce ON e.id_institucion = ce.centro_id
                        WHERE {$whereBase}";
             $st = $this->conn->prepare($sqlKpi);
@@ -226,6 +259,7 @@ class Reporte {
 
             $sqlUni = "SELECT COALESCE(SUM(ed.cantidad), 0) AS total_unidades
                        FROM entregas e
+                       INNER JOIN contratos c ON e.id_contrato = c.id
                        INNER JOIN entregas_detalle ed ON ed.id_entrega = e.id_entrega
                        LEFT JOIN centros_educativos ce ON e.id_institucion = ce.centro_id
                        WHERE {$whereBase}";
@@ -242,6 +276,7 @@ class Reporte {
 
             $sqlEst = "SELECT e.estado, COUNT(DISTINCT e.id_entrega) AS cantidad
                        FROM entregas e
+                       INNER JOIN contratos c ON e.id_contrato = c.id
                        LEFT JOIN centros_educativos ce ON e.id_institucion = ce.centro_id
                        WHERE {$whereBase}
                        GROUP BY e.estado
@@ -255,6 +290,7 @@ class Reporte {
                             COALESCE(MAX(eq.nombre_equipo), CONCAT('Equipo #', ed.id_equipo)) AS nombre_equipo,
                             SUM(ed.cantidad) AS total_cantidad
                        FROM entregas e
+                       INNER JOIN contratos c ON e.id_contrato = c.id
                        INNER JOIN entregas_detalle ed ON ed.id_entrega = e.id_entrega
                        LEFT JOIN equipos eq ON ed.id_equipo = eq.id_equipo
                        LEFT JOIN centros_educativos ce ON e.id_institucion = ce.centro_id
@@ -271,6 +307,7 @@ class Reporte {
                             COUNT(DISTINCT e.id_entrega) AS num_entregas,
                             COALESCE(SUM(ed.cantidad), 0) AS unidades
                        FROM entregas e
+                       INNER JOIN contratos c ON e.id_contrato = c.id
                        LEFT JOIN entregas_detalle ed ON ed.id_entrega = e.id_entrega
                        LEFT JOIN centros_educativos ce ON e.id_institucion = ce.centro_id
                        WHERE {$whereBase}
@@ -314,9 +351,10 @@ class Reporte {
     /**
      * Centros que recibieron un producto (equipo) en el rango de fechas, con unidades agregadas.
      */
-    public function centrosPorProductoEnRango(int $idEquipo, string $fechaDesde, string $fechaHasta, int $departamentoId = 0, int $municipioId = 0): array {
+    public function centrosPorProductoEnRango(int $idEquipo, string $fechaDesde, string $fechaHasta, int $departamentoId = 0, int $municipioId = 0, int $fuenteFinanciamientoId = 0): array {
         try {
             $filtroTerritorial = $this->construirFiltroTerritorial($departamentoId, $municipioId);
+            $filtroFuente = $this->construirFiltroFuenteFinanciamiento($fuenteFinanciamientoId);
             $sql = "SELECT 
                         e.id_institucion,
                         COALESCE(MAX(ce.nombre_ce), CONCAT('Institución ID ', e.id_institucion)) AS nombre_ce,
@@ -326,12 +364,13 @@ class Reporte {
                         SUM(ed.cantidad) AS unidades,
                         COUNT(DISTINCT e.id_entrega) AS num_entregas
                     FROM entregas e
+                    INNER JOIN contratos c ON e.id_contrato = c.id
                     INNER JOIN entregas_detalle ed ON ed.id_entrega = e.id_entrega
                     LEFT JOIN centros_educativos ce ON e.id_institucion = ce.centro_id
                     WHERE ed.id_equipo = :id_equipo
                       AND e.fecha_entrega IS NOT NULL
                       AND DATE(e.fecha_entrega) BETWEEN :desde AND :hasta
-                      {$filtroTerritorial['sql']}
+                      {$filtroTerritorial['sql']}{$filtroFuente['sql']}
                     GROUP BY e.id_institucion
                     ORDER BY unidades DESC, nombre_ce ASC";
             $st = $this->conn->prepare($sql);
@@ -339,7 +378,7 @@ class Reporte {
                 ':id_equipo' => $idEquipo,
                 ':desde' => $fechaDesde,
                 ':hasta' => $fechaHasta,
-            ], $filtroTerritorial['params']));
+            ], $filtroTerritorial['params'], $filtroFuente['params']));
             $filas = $st->fetchAll(PDO::FETCH_ASSOC);
             foreach ($filas as &$f) {
                 $f['unidades'] = (int) $f['unidades'];
@@ -357,18 +396,24 @@ class Reporte {
     /**
      * Vista general de calendarización de rutas de entrega por rango de fecha programada.
      */
-    public function calendarizacionRutas(string $fechaDesde, string $fechaHasta, int $departamentoId = 0, int $municipioId = 0): array {
+    public function calendarizacionRutas(string $fechaDesde, string $fechaHasta, int $departamentoId = 0, int $municipioId = 0, int $fuenteFinanciamientoId = 0): array {
         $vacio = ['resumen_estado' => [], 'rutas' => []];
         try {
             $filtroTerritorial = $this->construirFiltroTerritorial($departamentoId, $municipioId);
+            $filtroFuente = $this->construirFiltroFuenteFinanciamiento($fuenteFinanciamientoId);
             $where = "r.fecha_programada IS NOT NULL
                       AND r.fecha_programada BETWEEN :desde AND :hasta
-                      {$filtroTerritorial['sql']}";
-            $params = array_merge([':desde' => $fechaDesde, ':hasta' => $fechaHasta], $filtroTerritorial['params']);
+                      {$filtroTerritorial['sql']}{$filtroFuente['sql']}";
+            $params = array_merge(
+                [':desde' => $fechaDesde, ':hasta' => $fechaHasta],
+                $filtroTerritorial['params'],
+                $filtroFuente['params']
+            );
 
             $sqlResumen = "SELECT r.estado, COUNT(*) AS cantidad
                            FROM rutas_entrega r
                            LEFT JOIN centros_educativos ce ON ce.centro_id = r.id_institucion
+                           LEFT JOIN contratos c ON c.id = r.contrato_id
                            WHERE {$where}
                            GROUP BY r.estado
                            ORDER BY cantidad DESC, r.estado ASC";

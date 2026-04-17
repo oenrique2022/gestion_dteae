@@ -47,16 +47,19 @@ switch ($action) {
         $nombre = $_POST['nombre_equipo'] ?? '';
         $id_tipo = $_POST['id_tipo_equipo'] ?? '';
         $descripcion = $_POST['descripcion'] ?? '';
+        $estadoInventario = trim((string) ($_POST['estado_inventario'] ?? 'En inventario'));
+        $fechaAdqRaw = trim((string) ($_POST['fecha_adquisicion'] ?? ''));
+        $fechaAdquisicion = $fechaAdqRaw === '' ? null : $fechaAdqRaw;
 
         if (empty($id)) { // Crear
-            $nuevoId = $equipo->crear($codigo, $nombre, $id_tipo, $descripcion);
+            $nuevoId = $equipo->crear($codigo, $nombre, $id_tipo, $descripcion, $estadoInventario, $fechaAdquisicion);
             $response['success'] = $nuevoId !== false;
             $response['message'] = $nuevoId !== false ? 'Equipo creado exitosamente.' : 'Error al crear el equipo.';
             if ($nuevoId !== false) {
                 $response['data'] = ['id_equipo' => $nuevoId];
             }
         } else { // Actualizar
-            $resultado = $equipo->actualizar($id, $codigo, $nombre, $id_tipo, $descripcion);
+            $resultado = $equipo->actualizar($id, $codigo, $nombre, $id_tipo, $descripcion, $estadoInventario, $fechaAdquisicion);
             $response['message'] = $resultado ? 'Equipo actualizado exitosamente.' : 'Error al actualizar el equipo.';
             $response['success'] = $resultado;
         }

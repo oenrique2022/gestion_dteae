@@ -39,6 +39,8 @@ switch ($action) {
                     $detallesEquipos[] = [
                         'id' => $equipoData['id'],
                         'marca' => $equipoData['marca'] ?? '',
+                        'modelo' => $equipoData['modelo'] ?? '',
+                        'descripcion' => $equipoData['descripcion'] ?? '',
                         'cantidad' => $equipoData['cantidad'] ?? 0,
                         'precio' => $equipoData['precio'] ?? 0
                     ];

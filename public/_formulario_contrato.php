@@ -24,7 +24,7 @@ $ceModel = new CentroEducativo();
 $centros = $ceModel->leerTodos();
 
 $ffModel = new FuenteFinanciamiento();
-$fuentes = $ffModel->leerTodos();
+$fuentes = $ffModel->leerActivos();
 // ------------------- FIN DE CARGA DE DATOS -------------------
 ?>
 
@@ -111,7 +111,7 @@ $fuentes = $ffModel->leerTodos();
                             <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
                                 <div>
                                     <h5 class="mb-1">Líneas de equipo del contrato</h5>
-                                    <p class="small text-muted mb-0">Añada todas las líneas que necesite. Cada fila es un ítem distinto (mismo equipo puede repetirse con otra marca o precio). Si no encuentra un equipo en la lista, puede <strong>añadirlo al catálogo</strong> sin salir del formulario.</p>
+                                    <p class="small text-muted mb-0">Añada todas las líneas que necesite. Cada fila es un ítem distinto (mismo equipo puede repetirse con otra marca/modelo/precio). Si no encuentra un equipo en la lista, puede <strong>añadirlo al catálogo</strong> sin salir del formulario.</p>
                                 </div>
                                 <div class="d-flex flex-wrap gap-2 shrink-0">
                                     <button type="button" id="btnCatalogoNuevoEquipo" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#modalCatalogoEquipo" <?= empty($tipos_equipo_catalogo) ? 'disabled title="No hay tipos de equipo definidos"' : '' ?>>
@@ -129,7 +129,9 @@ $fuentes = $ffModel->leerTodos();
                             <thead class="table-dark">
                                 <tr>
                                     <th style="min-width:220px">Equipo</th>
-                                    <th style="min-width:100px">Marca</th>
+                                    <th style="min-width:120px">Marca</th>
+                                    <th style="min-width:120px">Modelo</th>
+                                    <th style="min-width:200px">Descripción</th>
                                     <th style="width:100px">Cantidad</th>
                                     <th style="min-width:110px">Precio unitario</th>
                                     <th class="text-center" style="width:56px" title="Quitar fila"><i class="fas fa-trash-alt text-white-50"></i></th>

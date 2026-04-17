@@ -3,6 +3,7 @@ require_once __DIR__ . '/Database.php';
 
 class Contrato {
     private $conn;
+    private static $columnasContratosEquiposCache = null;
 
     public function __construct() {
         $this->conn = Database::getInstance()->getConnection();
@@ -16,6 +17,28 @@ class Contrato {
             },
             $filas
         );
+    }
+
+    /** @return array<string,bool> */
+    private function columnasContratosEquipos(): array {
+        if (is_array(self::$columnasContratosEquiposCache)) {
+            return self::$columnasContratosEquiposCache;
+        }
+        $cols = [];
+        try {
+            $st = $this->conn->query('SHOW COLUMNS FROM contratos_equipos');
+            $rows = $st ? $st->fetchAll(PDO::FETCH_ASSOC) : [];
+            foreach ($rows as $r) {
+                $k = strtolower((string) ($r['Field'] ?? ''));
+                if ($k !== '') {
+                    $cols[$k] = true;
+                }
+            }
+        } catch (PDOException $e) {
+            error_log($e->getMessage());
+        }
+        self::$columnasContratosEquiposCache = $cols;
+        return $cols;
     }
     public function crearContratoCompleto($datosContrato, $detallesEquipos, $entregas, $archivos) {
         $this->conn->beginTransaction();
@@ -31,10 +54,32 @@ class Contrato {
             $idContrato = $this->conn->lastInsertId();
 
             // 2. Guardar Líneas de Equipos
-            $sql2 = "INSERT INTO contratos_equipos (contrato_id, equipo_id, cantidad, precio, marca) VALUES (?, ?, ?, ?, ?)";
+            $colsCE = $this->columnasContratosEquipos();
+            $campos = ['contrato_id', 'equipo_id', 'cantidad', 'precio', 'marca'];
+            $extractores = [
+                static fn($ctx, $eq) => $ctx['idContrato'],
+                static fn($ctx, $eq) => $eq['id'] ?? null,
+                static fn($ctx, $eq) => $eq['cantidad'] ?? 0,
+                static fn($ctx, $eq) => $eq['precio'] ?? 0,
+                static fn($ctx, $eq) => $eq['marca'] ?? '',
+            ];
+            if (!empty($colsCE['modelo'])) {
+                $campos[] = 'modelo';
+                $extractores[] = static fn($ctx, $eq) => $eq['modelo'] ?? '';
+            }
+            if (!empty($colsCE['descripcion'])) {
+                $campos[] = 'descripcion';
+                $extractores[] = static fn($ctx, $eq) => $eq['descripcion'] ?? '';
+            }
+            $ph = implode(', ', array_fill(0, count($campos), '?'));
+            $sql2 = 'INSERT INTO contratos_equipos (' . implode(', ', $campos) . ") VALUES ($ph)";
             $stmt2 = $this->conn->prepare($sql2);
             foreach ($detallesEquipos as $equipo) {
-                $stmt2->execute([$idContrato, $equipo['id'], $equipo['cantidad'], $equipo['precio'], $equipo['marca']]);
+                $vals = [];
+                foreach ($extractores as $ex) {
+                    $vals[] = $ex(['idContrato' => $idContrato], $equipo);
+                }
+                $stmt2->execute($vals);
             }
 
             // 3. Guardar Archivos Adjuntos (LÓGICA RESTAURADA)
@@ -336,10 +381,32 @@ class Contrato {
 
             // 2. Limpiar y re-insertar Líneas de Equipos
             $this->conn->prepare("DELETE FROM contratos_equipos WHERE contrato_id = ?")->execute([$idContrato]);
-            $sql2 = "INSERT INTO contratos_equipos (contrato_id, equipo_id, cantidad, precio, marca) VALUES (?, ?, ?, ?, ?)";
+            $colsCE = $this->columnasContratosEquipos();
+            $campos = ['contrato_id', 'equipo_id', 'cantidad', 'precio', 'marca'];
+            $extractores = [
+                static fn($ctx, $eq) => $ctx['idContrato'],
+                static fn($ctx, $eq) => $eq['id'] ?? null,
+                static fn($ctx, $eq) => $eq['cantidad'] ?? 0,
+                static fn($ctx, $eq) => $eq['precio'] ?? 0,
+                static fn($ctx, $eq) => $eq['marca'] ?? '',
+            ];
+            if (!empty($colsCE['modelo'])) {
+                $campos[] = 'modelo';
+                $extractores[] = static fn($ctx, $eq) => $eq['modelo'] ?? '';
+            }
+            if (!empty($colsCE['descripcion'])) {
+                $campos[] = 'descripcion';
+                $extractores[] = static fn($ctx, $eq) => $eq['descripcion'] ?? '';
+            }
+            $ph = implode(', ', array_fill(0, count($campos), '?'));
+            $sql2 = 'INSERT INTO contratos_equipos (' . implode(', ', $campos) . ") VALUES ($ph)";
             $stmt2 = $this->conn->prepare($sql2);
             foreach ($detallesEquipos as $equipo) {
-                $stmt2->execute([$idContrato, $equipo['id'], $equipo['cantidad'], $equipo['precio'], $equipo['marca']]);
+                $vals = [];
+                foreach ($extractores as $ex) {
+                    $vals[] = $ex(['idContrato' => $idContrato], $equipo);
+                }
+                $stmt2->execute($vals);
             }
             
             // 3. Guardar NUEVOS Archivos Adjuntos (LÓGICA RESTAURADA)

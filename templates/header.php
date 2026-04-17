@@ -33,6 +33,9 @@ require_once __DIR__ . '/../app/includes/config.php'; ?>
                     <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">Catálogos</a>
                     <ul class="dropdown-menu">
                         <li><a class="dropdown-item" href="gestion_centros_educativos.php"><i class="fas fa-school me-2 text-primary"></i>Centros educativos</a></li>
+                        <li><a class="dropdown-item" href="gestion_tipos_equipos.php"><i class="fas fa-tags me-2 text-primary"></i>Tipos de equipo (categorías)</a></li>
+                        <li><a class="dropdown-item" href="gestion_equipos.php"><i class="fas fa-boxes me-2 text-primary"></i>Equipos</a></li>
+                        <li><a class="dropdown-item" href="gestion_fuentes_financiamiento.php"><i class="fas fa-coins me-2 text-primary"></i>Fuentes de financiamiento</a></li>
                     </ul>
                 </li>
                 <li class="nav-item"><a class="nav-link" href="gestion_contratos.php">Contratos</a></li>

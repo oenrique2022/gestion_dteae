@@ -9,7 +9,7 @@ $tipos = $tipoEquipo->leerTodos();
 
 <div class="card shadow-sm">
     <div class="card-header d-flex justify-content-between align-items-center">
-        <h2 class="h5 mb-0"><i class="fas fa-laptop-code me-2"></i>Gestión de Equipos y Tecnologías</h2>
+        <h2 class="h5 mb-0"><i class="fas fa-boxes me-2"></i>Catálogo — Equipos</h2>
         <button id="btnNuevoEquipo" class="btn btn-primary btn-sm">
             <i class="fas fa-plus me-1"></i> Nuevo Equipo
         </button>
@@ -22,6 +22,8 @@ $tipos = $tipoEquipo->leerTodos();
                         <th>Código</th>
                         <th>Nombre del Equipo</th>
                         <th>Tipo</th>
+                        <th>Estado</th>
+                        <th>Fecha adquisición</th>
                         <th class="text-center">Activo</th>
                         <th class="text-end">Acciones</th>
                     </tr>
@@ -65,6 +67,20 @@ $tipos = $tipoEquipo->leerTodos();
                                 </option>
                             <?php endforeach; ?>
                         </select>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="estado_inventario" class="form-label">Estado en inventario</label>
+                            <select class="form-select" id="estado_inventario" name="estado_inventario">
+                                <option value="En inventario">En inventario</option>
+                                <option value="Entregado">Entregado</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="fecha_adquisicion" class="form-label">Fecha de adquisición</label>
+                            <input type="date" class="form-control" id="fecha_adquisicion" name="fecha_adquisicion">
+                        </div>
                     </div>
 
                     <div class="mb-3">
