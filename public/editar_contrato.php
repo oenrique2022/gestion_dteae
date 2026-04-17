@@ -1,4 +1,8 @@
 <?php
+require_once __DIR__ . '/../app/includes/verificar_sesion.php';
+if (!usuarioPuedeEscribir()) {
+    denegarAccesoPagina();
+}
 require_once __DIR__ . '/../app/clases/Contrato.php';
 
 $id_contrato = $_GET['id'] ?? null;

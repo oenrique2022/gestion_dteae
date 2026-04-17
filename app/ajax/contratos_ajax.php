@@ -1,5 +1,6 @@
 <?php
 header('Content-Type: application/json');
+require_once __DIR__ . '/../includes/verificar_sesion.php';
 
 require_once __DIR__ . '/../clases/Database.php';
 require_once __DIR__ . '/../clases/Contrato.php';
@@ -16,6 +17,9 @@ switch ($action) {
 
     case 'guardar':
     case 'actualizar':
+        if (!usuarioPuedeEscribir()) {
+            denegarAccesoApi('No tiene permisos para guardar o actualizar contratos.');
+        }
         
         $datosContrato = [
             'numero_contrato' => $_POST['numero_contrato'] ?? null,
@@ -88,6 +92,9 @@ switch ($action) {
         break;
 
     case 'eliminar':
+        if (!usuarioPuedeEliminar()) {
+            denegarAccesoApi('Solo administradores pueden eliminar contratos.');
+        }
         $id = $_POST['id'] ?? 0;
         if ($id) {
             $resultado = $contratoModel->eliminar($id);
@@ -98,12 +105,95 @@ switch ($action) {
         break;
     
     case 'eliminar_documento':
+        if (!usuarioPuedeEliminar()) {
+            denegarAccesoApi('Solo administradores pueden eliminar documentos.');
+        }
         $id_documento = $_POST['id_documento'] ?? 0;
         if ($id_documento) {
             $resultado = $contratoModel->eliminarDocumento($id_documento);
             $response = ['success' => $resultado, 'message' => $resultado ? 'Documento eliminado.' : 'Error al eliminar.'];
         } else {
             $response['message'] = 'ID de documento no válido.';
+        }
+        break;
+
+    case 'subir_documento_entrega':
+        if (!usuarioPuedeEscribir()) {
+            denegarAccesoApi('No tiene permisos para subir documentos de entrega.');
+        }
+        $idContrato = (int) ($_POST['id_contrato'] ?? 0);
+        $idInstitucion = (int) ($_POST['id_institucion'] ?? 0);
+        if (!empty($_FILES['archivo_pdf']['name']) && ($_FILES['archivo_pdf']['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK) {
+            $archivo = [
+                'nombre' => $_FILES['archivo_pdf']['name'],
+                'tmp_name' => $_FILES['archivo_pdf']['tmp_name'],
+                'size' => (int) ($_FILES['archivo_pdf']['size'] ?? 0),
+                'type' => $_FILES['archivo_pdf']['type'] ?? '',
+                'error' => (int) ($_FILES['archivo_pdf']['error'] ?? 0),
+            ];
+            $comentario = $_POST['comentario_archivo'] ?? '';
+            $response = $contratoModel->subirDocumentoEntregaCentro($idContrato, $idInstitucion, $archivo, $comentario);
+        } else {
+            $response = ['success' => false, 'message' => 'Seleccione un archivo PDF.'];
+        }
+        break;
+
+    case 'agregar_comentario_documento':
+        if (!usuarioPuedeEscribir()) {
+            denegarAccesoApi('No tiene permisos para comentar documentos.');
+        }
+        $idDocumento = (int) ($_POST['id_documento'] ?? 0);
+        $comentario = $_POST['comentario'] ?? '';
+        $response = $contratoModel->agregarComentarioDocumento($idDocumento, $comentario);
+        break;
+
+    case 'listar_rutas_entrega':
+        $idContrato = (int) ($_GET['id_contrato'] ?? $_POST['id_contrato'] ?? 0);
+        $response = $contratoModel->obtenerRutasEntregaContrato($idContrato);
+        break;
+
+    case 'guardar_ruta_entrega':
+        if (!usuarioPuedeEscribir()) {
+            denegarAccesoApi('No tiene permisos para guardar rutas de entrega.');
+        }
+        $payload = [
+            'id_contrato' => (int) ($_POST['id_contrato'] ?? 0),
+            'id_institucion' => (int) ($_POST['id_institucion'] ?? 0),
+            'responsable_entrega' => $_POST['responsable_entrega'] ?? '',
+            'motorista' => $_POST['motorista'] ?? '',
+            'vehiculo' => $_POST['vehiculo'] ?? '',
+            'placas' => $_POST['placas'] ?? '',
+            'estado' => $_POST['estado'] ?? 'Programada',
+            'fecha_programada' => $_POST['fecha_programada'] ?? '',
+            'fecha_en_ruta' => $_POST['fecha_en_ruta'] ?? '',
+            'fecha_entregado' => $_POST['fecha_entregado'] ?? '',
+            'comentarios' => $_POST['comentarios'] ?? '',
+        ];
+        $response = $contratoModel->guardarRutaEntrega($payload);
+        break;
+
+    case 'listar_documentos_ruta':
+        $idRuta = (int) ($_GET['id_ruta'] ?? $_POST['id_ruta'] ?? 0);
+        $response = $contratoModel->listarDocumentosRutaEntrega($idRuta);
+        break;
+
+    case 'subir_documento_ruta':
+        if (!usuarioPuedeEscribir()) {
+            denegarAccesoApi('No tiene permisos para subir documentos de ruta.');
+        }
+        $idRuta = (int) ($_POST['id_ruta'] ?? 0);
+        if (!empty($_FILES['archivo_pdf']['name']) && ($_FILES['archivo_pdf']['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK) {
+            $archivo = [
+                'nombre' => $_FILES['archivo_pdf']['name'],
+                'tmp_name' => $_FILES['archivo_pdf']['tmp_name'],
+                'size' => (int) ($_FILES['archivo_pdf']['size'] ?? 0),
+                'type' => $_FILES['archivo_pdf']['type'] ?? '',
+                'error' => (int) ($_FILES['archivo_pdf']['error'] ?? 0),
+            ];
+            $comentario = $_POST['comentario_archivo'] ?? '';
+            $response = $contratoModel->subirDocumentoRutaEntrega($idRuta, $archivo, $comentario);
+        } else {
+            $response = ['success' => false, 'message' => 'Seleccione un archivo PDF.'];
         }
         break;
 }

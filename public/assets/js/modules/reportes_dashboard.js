@@ -2,6 +2,7 @@
     let chartMes = null;
     /** Filas del último top productos (para abrir el modal con el nombre correcto). */
     let ultimoTopProductos = [];
+    let municipiosPorDepartamento = {};
 
     const fmt = (n) => new Intl.NumberFormat('es-ES').format(n);
 
@@ -60,9 +61,79 @@
         }
     };
 
+    const mostrarErrorRutas = (msg) => {
+        const el = document.getElementById('calendarizacionRutasError');
+        if (!el) return;
+        if (msg) {
+            el.textContent = msg;
+            el.classList.remove('d-none');
+        } else {
+            el.textContent = '';
+            el.classList.add('d-none');
+        }
+    };
+
+    const getFiltrosTerritorio = () => {
+        const departamentoId = document.getElementById('filtroDepartamentoDash')?.value || '';
+        const municipioId = document.getElementById('filtroMunicipioDash')?.value || '';
+        return { departamentoId, municipioId };
+    };
+
+    const poblarSelect = (selectEl, items, valueField = 'value', labelField = 'label') => {
+        if (!selectEl) return;
+        const valueActual = selectEl.value;
+        selectEl.innerHTML = '<option value="">Todos</option>';
+        (items || []).forEach((item) => {
+            const opt = document.createElement('option');
+            if (typeof item === 'object' && item !== null) {
+                opt.value = String(item[valueField] ?? '');
+                opt.textContent = String(item[labelField] ?? item[valueField] ?? '');
+            } else {
+                opt.value = String(item);
+                opt.textContent = String(item);
+            }
+            selectEl.appendChild(opt);
+        });
+        if (valueActual && Array.from(selectEl.options).some((o) => o.value === valueActual)) {
+            selectEl.value = valueActual;
+        }
+    };
+
+    const actualizarMunicipiosPorDepartamento = () => {
+        const dep = document.getElementById('filtroDepartamentoDash')?.value || '';
+        const municipioEl = document.getElementById('filtroMunicipioDash');
+        if (!municipioEl) return;
+        const municipios = dep ? (municipiosPorDepartamento[dep] || []) : [];
+        poblarSelect(municipioEl, municipios, 'id', 'nombre');
+        municipioEl.disabled = !dep;
+    };
+
+    const cargarFiltrosTerritoriales = () => {
+        const depEl = document.getElementById('filtroDepartamentoDash');
+        const munEl = document.getElementById('filtroMunicipioDash');
+        if (!depEl || !munEl) return Promise.resolve();
+
+        return fetch('../app/ajax/reportes_ajax.php?action=filtros_territorio')
+            .then((r) => r.json())
+            .then((res) => {
+                if (!res.success) return;
+                const data = res.data || {};
+                municipiosPorDepartamento = data.municipios_por_departamento || {};
+                poblarSelect(depEl, data.departamentos || [], 'id', 'nombre');
+                actualizarMunicipiosPorDepartamento();
+            })
+            .catch(() => {
+                municipiosPorDepartamento = {};
+                poblarSelect(depEl, []);
+                poblarSelect(munEl, []);
+                munEl.disabled = true;
+            });
+    };
+
     const abrirModalCentrosProducto = (idEquipo, nombreProducto) => {
         const desde = document.getElementById('fechaDesdeDash')?.value;
         const hasta = document.getElementById('fechaHastaDash')?.value;
+        const filtros = getFiltrosTerritorio();
         if (!desde || !hasta) return;
 
         const modalEl = document.getElementById('modalCentrosPorProducto');
@@ -81,14 +152,14 @@
 
         window.bootstrap.Modal.getOrCreateInstance(modalEl).show();
 
-        const url = `../app/ajax/reportes_ajax.php?action=centros_por_producto&id_equipo=${encodeURIComponent(idEquipo)}&fecha_desde=${encodeURIComponent(desde)}&fecha_hasta=${encodeURIComponent(hasta)}`;
+        const url = `../app/ajax/reportes_ajax.php?action=centros_por_producto&id_equipo=${encodeURIComponent(idEquipo)}&fecha_desde=${encodeURIComponent(desde)}&fecha_hasta=${encodeURIComponent(hasta)}&departamento_id=${encodeURIComponent(filtros.departamentoId)}&municipio_id=${encodeURIComponent(filtros.municipioId)}`;
 
         fetch(url)
             .then((r) => r.json())
             .then((res) => {
                 if (cargando) cargando.classList.add('d-none');
                 if (!res.success) {
-                    tbodyM.innerHTML = `<tr><td colspan="4" class="text-center text-danger py-3">${esc(res.message || 'Error al cargar.')}</td></tr>`;
+                    tbodyM.innerHTML = `<tr><td colspan="5" class="text-center text-danger py-3">${esc(res.message || 'Error al cargar.')}</td></tr>`;
                     return;
                 }
                 const filas = res.data || [];
@@ -98,8 +169,11 @@
                 }
                 filas.forEach((f) => {
                     const cod = f.codigo_infraestructura || '—';
+                    const departamento = f.departamento || '—';
+                    const municipio = f.municipio || '—';
                     tbodyM.innerHTML += `<tr>
                         <td>${esc(f.nombre_ce)}</td>
+                        <td>${esc(`${departamento} / ${municipio}`)}</td>
                         <td>${esc(cod)}</td>
                         <td class="text-end">${fmt(f.unidades)}</td>
                         <td class="text-end">${fmt(f.num_entregas)}</td>
@@ -108,7 +182,7 @@
             })
             .catch(() => {
                 if (cargando) cargando.classList.add('d-none');
-                tbodyM.innerHTML = '<tr><td colspan="4" class="text-center text-danger py-3">Error de red.</td></tr>';
+                tbodyM.innerHTML = '<tr><td colspan="5" class="text-center text-danger py-3">Error de red.</td></tr>';
             });
     };
 
@@ -232,13 +306,80 @@
         });
     };
 
+    const renderCalendarizacionRutas = (data) => {
+        const tbody = document.getElementById('tablaCalendarizacionRutas');
+        const resumen = document.getElementById('resumenRutasEstado');
+        if (!tbody || !resumen) return;
+
+        const resumenEstado = data.resumen_estado || [];
+        const rutas = data.rutas || [];
+
+        if (!resumenEstado.length) {
+            resumen.textContent = 'Sin rutas programadas en el rango.';
+        } else {
+            resumen.textContent = resumenEstado
+                .map((r) => `${r.estado || '—'}: ${fmt(r.cantidad || 0)}`)
+                .join(' | ');
+        }
+
+        tbody.innerHTML = '';
+        if (!rutas.length) {
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3">Sin rutas programadas</td></tr>';
+            return;
+        }
+
+        rutas.forEach((r) => {
+            const fecha = r.fecha_programada || '—';
+            const contrato = r.numero_contrato || `#${r.contrato_id || '—'}`;
+            const centro = r.nombre_ce || `ID ${r.id_institucion || '—'}`;
+            const ubicacion = `${r.departamento || '—'} / ${r.municipio || '—'}`;
+            const responsable = r.responsable_entrega || '—';
+            const motoristaVehiculo = `${r.motorista || '—'} / ${(r.vehiculo || '—')} (${r.placas || '—'})`;
+            tbody.innerHTML += `<tr>
+                <td>${esc(fecha)}</td>
+                <td>${esc(r.estado || '—')}</td>
+                <td>${esc(contrato)}</td>
+                <td>${esc(centro)}</td>
+                <td>${esc(ubicacion)}</td>
+                <td>${esc(responsable)}</td>
+                <td>${esc(motoristaVehiculo)}</td>
+            </tr>`;
+        });
+    };
+
+    const cargarCalendarizacionRutas = () => {
+        const desde = document.getElementById('fechaDesdeDash')?.value;
+        const hasta = document.getElementById('fechaHastaDash')?.value;
+        const filtros = getFiltrosTerritorio();
+        if (!desde || !hasta) return;
+
+        mostrarErrorRutas('');
+        const url = `../app/ajax/reportes_ajax.php?action=calendarizacion_rutas&fecha_desde=${encodeURIComponent(desde)}&fecha_hasta=${encodeURIComponent(hasta)}&departamento_id=${encodeURIComponent(filtros.departamentoId)}&municipio_id=${encodeURIComponent(filtros.municipioId)}`;
+
+        fetch(url)
+            .then((r) => r.json())
+            .then((res) => {
+                if (!res.success) {
+                    mostrarErrorRutas(res.message || 'No se pudo cargar la calendarización.');
+                    renderCalendarizacionRutas({ resumen_estado: [], rutas: [] });
+                    return;
+                }
+                renderCalendarizacionRutas(res.data || {});
+            })
+            .catch(() => {
+                mostrarErrorRutas('Error de red al cargar la calendarización de rutas.');
+                renderCalendarizacionRutas({ resumen_estado: [], rutas: [] });
+            });
+    };
+
     const cargar = () => {
         const desde = document.getElementById('fechaDesdeDash')?.value;
         const hasta = document.getElementById('fechaHastaDash')?.value;
+        const filtros = getFiltrosTerritorio();
         if (!desde || !hasta) return;
 
         mostrarError('');
-        const url = `../app/ajax/reportes_ajax.php?action=resumen_gerencial&fecha_desde=${encodeURIComponent(desde)}&fecha_hasta=${encodeURIComponent(hasta)}`;
+        const url = `../app/ajax/reportes_ajax.php?action=resumen_gerencial&fecha_desde=${encodeURIComponent(desde)}&fecha_hasta=${encodeURIComponent(hasta)}&departamento_id=${encodeURIComponent(filtros.departamentoId)}&municipio_id=${encodeURIComponent(filtros.municipioId)}`;
 
         fetch(url)
             .then((r) => r.json())
@@ -261,9 +402,11 @@
 
                 renderTablas(d);
                 renderChart(d.por_mes || []);
+                cargarCalendarizacionRutas();
             })
             .catch(() => {
                 mostrarError('Error de red al cargar el dashboard.');
+                cargarCalendarizacionRutas();
             });
     };
 
@@ -274,8 +417,15 @@
         const hastaEl = document.getElementById('fechaHastaDash');
         if (desdeEl) desdeEl.value = ymd(inicioAnio);
         if (hastaEl) hastaEl.value = ymd(hoy);
+        const municipioEl = document.getElementById('filtroMunicipioDash');
+        if (municipioEl) municipioEl.disabled = true;
 
         document.getElementById('btnAplicarRango')?.addEventListener('click', cargar);
+        document.getElementById('filtroDepartamentoDash')?.addEventListener('change', function () {
+            actualizarMunicipiosPorDepartamento();
+            cargar();
+        });
+        document.getElementById('filtroMunicipioDash')?.addEventListener('change', cargar);
 
         document.querySelectorAll('[data-preset]').forEach((btn) => {
             btn.addEventListener('click', function () {
@@ -302,6 +452,6 @@
             });
         }
 
-        cargar();
+        cargarFiltrosTerritoriales().finally(cargar);
     });
 })();

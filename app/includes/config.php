@@ -1,9 +1,15 @@
 <?php
-// Configuración de la Base de Datos
+/* Configuración de la Base de Datos
 define('DB_HOST', '203.161.62.79');
 define('DB_USER', 'dtae');
 define('DB_PASS', 'dtae2025@');
 define('DB_NAME', 'desarrollo_dteae_administracion');
+define('DB_CHARSET', 'utf8mb4');
+*/
+define('DB_HOST', '203.161.62.79');
+define('DB_USER', 'root2');
+define('DB_PASS', 'reyesl001');
+define('DB_NAME', 'dteae_administracion_desarrollo_no_produccion');
 define('DB_CHARSET', 'utf8mb4');
 
 // --- INICIO DEL CÓDIGO DINÁMICO PARA LA URL ---

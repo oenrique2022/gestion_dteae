@@ -25,6 +25,18 @@
                 <label for="fechaHastaDash" class="form-label small text-muted mb-0">Hasta</label>
                 <input type="date" class="form-control form-control-sm" id="fechaHastaDash" required>
             </div>
+            <div class="col-12 col-md-3 col-lg-2">
+                <label for="filtroDepartamentoDash" class="form-label small text-muted mb-0">Departamento</label>
+                <select class="form-select form-select-sm" id="filtroDepartamentoDash">
+                    <option value="">Todos</option>
+                </select>
+            </div>
+            <div class="col-12 col-md-3 col-lg-2">
+                <label for="filtroMunicipioDash" class="form-label small text-muted mb-0">Municipio</label>
+                <select class="form-select form-select-sm" id="filtroMunicipioDash">
+                    <option value="">Todos</option>
+                </select>
+            </div>
             <div class="col-12 col-md-auto d-flex flex-wrap gap-2">
                 <button type="button" class="btn btn-primary btn-sm" id="btnAplicarRango">
                     <i class="fas fa-filter me-1"></i>Aplicar
@@ -36,6 +48,33 @@
             </div>
         </form>
         <p class="text-danger small mb-0 mt-2 d-none" id="dashboardError"></p>
+    </div>
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header">
+        <h3 class="h6 mb-0"><i class="fas fa-route me-2"></i>Calendarización general de rutas de entrega</h3>
+        <p class="small text-muted mb-0 mt-1">Rutas programadas en el rango seleccionado (vista consolidada).</p>
+    </div>
+    <div class="card-body p-0">
+        <div class="px-3 py-2 border-bottom small text-muted" id="resumenRutasEstado">Sin datos</div>
+        <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Fecha programada</th>
+                        <th>Estado</th>
+                        <th>Contrato</th>
+                        <th>Centro educativo</th>
+                        <th>Ubicación</th>
+                        <th>Responsable</th>
+                        <th>Motorista / Vehículo</th>
+                    </tr>
+                </thead>
+                <tbody id="tablaCalendarizacionRutas"></tbody>
+            </table>
+        </div>
+        <p class="text-danger small mb-0 p-3 d-none" id="calendarizacionRutasError"></p>
     </div>
 </div>
 
@@ -156,6 +195,7 @@
                         <thead class="table-light">
                             <tr>
                                 <th>Centro educativo</th>
+                                <th>Ubicación</th>
                                 <th>Cód. infra.</th>
                                 <th class="text-end">Unidades</th>
                                 <th class="text-end">Entregas</th>

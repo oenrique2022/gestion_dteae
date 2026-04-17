@@ -153,16 +153,37 @@ $fuentes = $ffModel->leerTodos();
                 <h5>Archivos Existentes</h5>
                 <ul class="list-group mb-4" id="listaArchivosExistentes">
                     <?php foreach($contrato['documentos'] as $doc): ?>
-                        <li class="list-group-item d-flex justify-content-between align-items-center" id="doc-<?= $doc['id'] ?>">
-                            <div>
-                                <a href="<?= APP_URL . htmlspecialchars($doc['ruta_archivo']) ?>" target="_blank" title="Ver/Descargar Archivo">
-                                    <i class="fas fa-file-alt me-2"></i><?= htmlspecialchars($doc['nombre_archivo']) ?>
-                                </a>
-                                <p class="mb-0 text-muted small fst-italic">"<?= htmlspecialchars($doc['descripcion']) ?>"</p>
+                        <?php $comentariosDoc = isset($doc['comentarios_adicionales']) && is_array($doc['comentarios_adicionales']) ? $doc['comentarios_adicionales'] : []; ?>
+                        <li class="list-group-item" id="doc-<?= $doc['id'] ?>">
+                            <div class="d-flex justify-content-between align-items-start gap-3">
+                                <div class="flex-grow-1">
+                                    <a href="<?= APP_URL . htmlspecialchars($doc['ruta_archivo']) ?>" target="_blank" title="Ver/Descargar Archivo">
+                                        <i class="fas fa-file-alt me-2"></i><?= htmlspecialchars($doc['nombre_archivo']) ?>
+                                    </a>
+                                    <p class="mb-1 text-muted small fst-italic">"<?= htmlspecialchars($doc['descripcion']) ?>"</p>
+                                    <div class="border-start ps-2 mt-2 small" id="doc-comments-<?= (int) $doc['id'] ?>">
+                                        <?php if (!empty($comentariosDoc)): ?>
+                                            <?php foreach ($comentariosDoc as $com): ?>
+                                                <div class="mb-1 text-secondary">
+                                                    <i class="fas fa-comment-dots me-1"></i>
+                                                    <?= htmlspecialchars((string) ($com['comentario'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
+                                                    <span class="text-muted">— <?= htmlspecialchars((string) ($com['fecha_comentario'] ?? ''), ENT_QUOTES, 'UTF-8') ?></span>
+                                                </div>
+                                            <?php endforeach; ?>
+                                        <?php else: ?>
+                                            <div class="text-muted fst-italic" id="doc-comments-empty-<?= (int) $doc['id'] ?>">Sin comentarios adicionales.</div>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
+                                <div class="d-flex gap-2">
+                                    <button type="button" class="btn btn-outline-primary btn-sm btn-comentar-documento" data-id="<?= (int) $doc['id'] ?>" title="Agregar comentario">
+                                        <i class="fas fa-comment-medical"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-outline-danger btn-sm btn-eliminar-documento" data-id="<?= (int) $doc['id'] ?>" title="Eliminar este archivo">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
                             </div>
-                            <button type="button" class="btn btn-outline-danger btn-sm btn-eliminar-documento" data-id="<?= $doc['id'] ?>" title="Eliminar este archivo">
-                                <i class="fas fa-trash"></i>
-                            </button>
                         </li>
                     <?php endforeach; ?>
                 </ul>
@@ -244,6 +265,9 @@ $fuentes = $ffModel->leerTodos();
                                         $fechaEnt = !empty($ent['fecha_entrega']) ? htmlspecialchars(substr((string) $ent['fecha_entrega'], 0, 10), ENT_QUOTES, 'UTF-8') : '—';
                                         $estadoEnt = htmlspecialchars((string) ($ent['estado'] ?? '—'), ENT_QUOTES, 'UTF-8');
                                         $badgeEst = (($ent['estado'] ?? '') === 'Entregado') ? 'bg-success' : 'bg-info text-dark';
+                                        $docsEnt = isset($ent['documentos_entrega']) && is_array($ent['documentos_entrega']) ? $ent['documentos_entrega'] : [];
+                                        $nDocsEnt = count($docsEnt);
+                                        $idContratoGen = (int) ($contrato['generales']['id'] ?? 0);
                                         ?>
                                         <tr>
                                             <td><?= (int) $idxEnt ?></td>
@@ -252,6 +276,14 @@ $fuentes = $ffModel->leerTodos();
                                             <td><span class="badge <?= $badgeEst ?>"><?= $estadoEnt ?></span></td>
                                             <td class="text-end text-nowrap">
                                                 <button type="button" class="btn btn-sm btn-outline-primary btn-detalle-entrega" data-entrega-id="<?= $eidAttr ?>"><i class="fas fa-edit me-1"></i>Detalles</button>
+                                                <?php if ($modo === 'editar' && $idContratoGen > 0): ?>
+                                                    <button type="button" class="btn btn-sm btn-outline-success btn-docs-entrega position-relative" data-entrega-id="<?= $eidAttr ?>" title="Comprobantes PDF por centro">
+                                                        <i class="fas fa-file-upload"></i>
+                                                        <?php if ($nDocsEnt > 0): ?>
+                                                            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-success" style="font-size:0.65rem"><?= (int) $nDocsEnt ?></span>
+                                                        <?php endif; ?>
+                                                    </button>
+                                                <?php endif; ?>
                                                 <?php if ($eidRaw !== '' && is_numeric($eidRaw) && (int) $eidRaw > 0): ?>
                                                     <a class="btn btn-sm btn-outline-secondary" href="acta_entrega_pdf.php?id_entrega=<?= (int) $eidRaw ?>" target="_blank" rel="noopener" title="Acta de recepción (PDF)"><i class="fas fa-file-pdf"></i></a>
                                                 <?php endif; ?>
@@ -394,6 +426,41 @@ $fuentes = $ffModel->leerTodos();
     </div>
 </div>
 
+<!-- Modal: comprobantes PDF por centro (entrega) -->
+<div class="modal fade" id="modalDocumentosEntrega" tabindex="-1" aria-labelledby="modalDocumentosEntregaTitulo" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title" id="modalDocumentosEntregaTitulo"><i class="fas fa-file-upload me-2"></i>Comprobantes de entrega</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                <p class="small text-muted mb-2" id="modalDocumentosEntregaSubtitulo"></p>
+                <h6 class="small fw-semibold text-secondary text-uppercase mb-2">Archivos registrados</h6>
+                <div id="modalDocumentosEntregaLista" class="list-group mb-3"></div>
+                <p class="text-muted small mb-3 d-none" id="modalDocumentosEntregaVacio">No hay PDFs subidos aún para este centro.</p>
+                <hr class="my-3">
+                <h6 class="small fw-semibold text-secondary text-uppercase mb-2">Subir nuevo PDF</h6>
+                <p class="small text-muted">Al guardar el comprobante, el estado de la entrega pasa a <strong>Entregado</strong>.</p>
+                <form id="formSubirDocEntrega" enctype="multipart/form-data">
+                    <input type="hidden" id="doc_entrega_id_entrega_ctx" value="" autocomplete="off">
+                    <div class="mb-3">
+                        <label for="doc_entrega_archivo" class="form-label">Archivo PDF <span class="text-danger">*</span></label>
+                        <input type="file" class="form-control" id="doc_entrega_archivo" accept="application/pdf,.pdf" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="doc_entrega_comentario" class="form-label">Comentario</label>
+                        <textarea class="form-control" id="doc_entrega_comentario" rows="2" placeholder="Descripción o nota sobre este archivo"></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary" id="btnSubirDocEntrega">
+                        <i class="fas fa-cloud-upload-alt me-1"></i>Subir y marcar entregado
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
 <?php
 $jsonFlags = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS;
 if (defined('JSON_INVALID_UTF8_SUBSTITUTE')) {
@@ -430,6 +497,8 @@ $jsonContrato = static function ($data) use ($jsonFlags) {
     const equiposContrato = <?= $jsonContrato($contrato['equipos'] ?? []) ?>;
     const equiposDisponibles = <?= $jsonContrato($equipos ?? []) ?>;
     window.URL_AJAX_EQUIPOS = '../app/ajax/equipos_ajax.php';
+    window.APP_PUBLIC_BASE = <?= json_encode(rtrim(APP_URL, '/'), $jsonFlags) ?>;
+    window.URL_AJAX_CONTRATOS = '../app/ajax/contratos_ajax.php';
 </script>
 
 <?php 

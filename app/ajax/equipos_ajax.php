@@ -11,6 +11,7 @@ if (!isset($_SESSION['id_usuario'])) {
     echo json_encode(['success' => false, 'message' => 'Sesión requerida']);
     exit;
 }
+require_once __DIR__ . '/../includes/verificar_sesion.php';
 
 require_once __DIR__ . '/../clases/Database.php';
 require_once __DIR__ . '/../clases/Equipo.php';
@@ -38,6 +39,9 @@ switch ($action) {
         break;
 
     case 'guardar':
+        if (!usuarioPuedeEscribir()) {
+            denegarAccesoApi('No tiene permisos para guardar equipos.');
+        }
         $id = $_POST['id_equipo'] ?? null;
         $codigo = $_POST['codigo_equipo'] ?? '';
         $nombre = $_POST['nombre_equipo'] ?? '';
@@ -60,6 +64,9 @@ switch ($action) {
 
     /** Alta rápida desde formulario de contrato (nombre + tipo; código opcional). */
     case 'crear_rapido':
+        if (!usuarioPuedeEscribir()) {
+            denegarAccesoApi('No tiene permisos para crear equipos.');
+        }
         $nombre = trim((string) ($_POST['nombre_equipo'] ?? ''));
         $codigo = trim((string) ($_POST['codigo_equipo'] ?? ''));
         $idTipoRaw = $_POST['id_tipo_equipo'] ?? '';
@@ -105,6 +112,9 @@ switch ($action) {
         break;
 
     case 'eliminar':
+        if (!usuarioPuedeEliminar()) {
+            denegarAccesoApi('Solo administradores pueden eliminar equipos.');
+        }
         $id = $_POST['id'] ?? 0;
         $resultado = $equipo->eliminar($id);
         $response['success'] = $resultado;
@@ -112,6 +122,9 @@ switch ($action) {
         break;
 
     case 'cambiar_estado':
+        if (!usuarioPuedeEscribir()) {
+            denegarAccesoApi('No tiene permisos para cambiar estado de equipos.');
+        }
         $id = $_POST['id'] ?? 0;
         $estado = $_POST['estado'] ?? 0;
         $resultado = $equipo->cambiarEstado($id, $estado);

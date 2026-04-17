@@ -1,6 +1,9 @@
 <?php
 // Este archivo está protegido por el guardián que ya incluimos en el header
 require_once __DIR__ . '/../templates/header.php';
+if (!usuarioEsAdmin()) {
+    denegarAccesoPagina();
+}
 // Necesitamos la lista de roles para el menú desplegable del formulario
 require_once __DIR__ . '/../app/clases/Rol.php';
 

@@ -1,6 +1,9 @@
 document.addEventListener('DOMContentLoaded', function() {
     const tablaEquiposBody = document.getElementById('tablaEquiposBody');
     if (!tablaEquiposBody) return; // Si no estamos en la página de equipos, no hacer nada
+    const permisos = window.APP_PERMISOS || {};
+    const puedeEscribir = !!permisos.puedeEscribir;
+    const puedeEliminar = !!permisos.puedeEliminar;
 
     const equipoModal = new bootstrap.Modal(document.getElementById('equipoModal'));
     const equipoForm = document.getElementById('equipoForm');
@@ -25,8 +28,8 @@ document.addEventListener('DOMContentLoaded', function() {
                                     </div>
                                 </td>
                                 <td class="text-end">
-                                    <button class="btn btn-warning btn-sm btn-editar" data-id="${equipo.id_equipo}"><i class="fas fa-edit"></i></button>
-                                    <button class="btn btn-danger btn-sm btn-eliminar" data-id="${equipo.id_equipo}"><i class="fas fa-trash"></i></button>
+                                    ${puedeEscribir ? `<button class="btn btn-warning btn-sm btn-editar" data-id="${equipo.id_equipo}"><i class="fas fa-edit"></i></button>` : ''}
+                                    ${puedeEliminar ? `<button class="btn btn-danger btn-sm btn-eliminar" data-id="${equipo.id_equipo}"><i class="fas fa-trash"></i></button>` : ''}
                                 </td>
                             </tr>
                         `;
@@ -37,15 +40,24 @@ document.addEventListener('DOMContentLoaded', function() {
             });
     };
 
-    document.getElementById('btnNuevoEquipo').addEventListener('click', () => {
-        equipoForm.reset();
-        document.getElementById('id_equipo').value = '';
-        equipoModalTitle.textContent = 'Nuevo Equipo';
-        equipoModal.show();
-    });
+    const btnNuevoEquipo = document.getElementById('btnNuevoEquipo');
+    if (btnNuevoEquipo) {
+        btnNuevoEquipo.style.display = puedeEscribir ? '' : 'none';
+        btnNuevoEquipo.addEventListener('click', () => {
+            if (!puedeEscribir) return;
+            equipoForm.reset();
+            document.getElementById('id_equipo').value = '';
+            equipoModalTitle.textContent = 'Nuevo Equipo';
+            equipoModal.show();
+        });
+    }
 
     equipoForm.addEventListener('submit', function(e) {
         e.preventDefault();
+        if (!puedeEscribir) {
+            Swal.fire('Sin permiso', 'Solo puede consultar esta sección.', 'warning');
+            return;
+        }
         const formData = new FormData(this);
         fetch('../app/ajax/equipos_ajax.php?action=guardar', { method: 'POST', body: formData })
             .then(response => response.json())
@@ -67,6 +79,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const id = target.getAttribute('data-id');
 
         if (target.classList.contains('btn-editar')) {
+            if (!puedeEscribir) return;
             fetch(`../app/ajax/equipos_ajax.php?action=obtener&id=${id}`)
                 .then(response => response.json())
                 .then(data => {
@@ -84,6 +97,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         if (target.classList.contains('btn-eliminar')) {
+            if (!puedeEliminar) return;
             Swal.fire({
                 title: '¿Estás seguro?', text: "¡No podrás revertir esto!", icon: 'warning',
                 showCancelButton: true, confirmButtonColor: '#d33', cancelButtonColor: '#3085d6',
@@ -109,6 +123,11 @@ document.addEventListener('DOMContentLoaded', function() {
     
     tablaEquiposBody.addEventListener('change', function(e) {
         if (e.target.classList.contains('estado-switch')) {
+            if (!puedeEscribir) {
+                e.target.checked = !e.target.checked;
+                Swal.fire('Sin permiso', 'Solo puede consultar esta sección.', 'warning');
+                return;
+            }
             const id = e.target.getAttribute('data-id');
             const estado = e.target.checked ? 1 : 0;
             

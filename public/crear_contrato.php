@@ -1,4 +1,8 @@
 <?php
+require_once __DIR__ . '/../app/includes/verificar_sesion.php';
+if (!usuarioPuedeEscribir()) {
+    denegarAccesoPagina();
+}
 // Define una variable para indicar el modo y un array vacío para los datos
 $modo = 'crear';
 $contrato = [

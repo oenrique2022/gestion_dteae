@@ -1,5 +1,6 @@
 <?php
 header('Content-Type: application/json');
+require_once __DIR__ . '/../includes/verificar_sesion.php';
 require_once __DIR__ . '/../clases/Proveedor.php';
 
 $proveedor = new Proveedor();
@@ -24,6 +25,9 @@ switch ($action) {
         break;
 
     case 'guardar':
+        if (!usuarioPuedeEscribir()) {
+            denegarAccesoApi('No tiene permisos para guardar proveedores.');
+        }
         // Recoger datos del POST
         $id = $_POST['id_proveedor'] ?? null;
         $nombre = $_POST['nombre_proveedor'] ?? '';
@@ -43,6 +47,9 @@ switch ($action) {
         break;
 
     case 'eliminar':
+        if (!usuarioPuedeEliminar()) {
+            denegarAccesoApi('Solo administradores pueden eliminar proveedores.');
+        }
         $id = $_POST['id'] ?? 0;
         $resultado = $proveedor->eliminar($id);
         if ($resultado) {

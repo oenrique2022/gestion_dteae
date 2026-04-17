@@ -104,12 +104,98 @@ class Reporte {
     }
 
     /**
+     * Opciones de filtros territoriales basadas en los centros educativos.
+     */
+    public function obtenerFiltrosTerritorio(): array {
+        try {
+            $sqlDeps = "SELECT DISTINCT
+                            departamento_id,
+                            TRIM(COALESCE(departamento, '')) AS departamento
+                        FROM centros_educativos
+                        WHERE departamento_id IS NOT NULL
+                        ORDER BY departamento ASC";
+            $st = $this->conn->prepare($sqlDeps);
+            $st->execute();
+            $rowsDeps = $st->fetchAll(PDO::FETCH_ASSOC);
+
+            $departamentos = [];
+            $municipiosPorDepartamento = [];
+            foreach ($rowsDeps as $r) {
+                $depId = isset($r['departamento_id']) ? (int) $r['departamento_id'] : 0;
+                $depNombre = trim((string) ($r['departamento'] ?? ''));
+                if ($depId < 1) {
+                    continue;
+                }
+                $departamentos[] = [
+                    'id' => $depId,
+                    'nombre' => $depNombre !== '' ? $depNombre : ("Departamento " . $depId),
+                ];
+                $municipiosPorDepartamento[(string) $depId] = [];
+            }
+
+            $sqlMuns = "SELECT DISTINCT
+                            departamento_id,
+                            municipio_id,
+                            TRIM(COALESCE(municipio, '')) AS municipio
+                        FROM centros_educativos
+                        WHERE departamento_id IS NOT NULL
+                          AND municipio_id IS NOT NULL
+                        ORDER BY municipio ASC";
+            $st = $this->conn->prepare($sqlMuns);
+            $st->execute();
+            $rowsMuns = $st->fetchAll(PDO::FETCH_ASSOC);
+            foreach ($rowsMuns as $r) {
+                $depId = isset($r['departamento_id']) ? (int) $r['departamento_id'] : 0;
+                $munId = isset($r['municipio_id']) ? (int) $r['municipio_id'] : 0;
+                if ($depId < 1 || $munId < 1) {
+                    continue;
+                }
+                $munNombre = trim((string) ($r['municipio'] ?? ''));
+                $depKey = (string) $depId;
+                if (!isset($municipiosPorDepartamento[$depKey])) {
+                    $municipiosPorDepartamento[$depKey] = [];
+                }
+                $municipiosPorDepartamento[$depKey][] = [
+                    'id' => $munId,
+                    'nombre' => $munNombre !== '' ? $munNombre : ("Municipio " . $munId),
+                ];
+            }
+
+            return [
+                'departamentos' => $departamentos,
+                'municipios_por_departamento' => $municipiosPorDepartamento,
+            ];
+        } catch (PDOException $e) {
+            error_log($e->getMessage());
+            return [
+                'departamentos' => [],
+                'municipios_por_departamento' => [],
+            ];
+        }
+    }
+
+    private function construirFiltroTerritorial(int $departamentoId = 0, int $municipioId = 0): array {
+        $sql = '';
+        $params = [];
+        if ($departamentoId > 0) {
+            $sql .= ' AND ce.departamento_id = :departamento_id';
+            $params[':departamento_id'] = $departamentoId;
+        }
+        if ($municipioId > 0) {
+            $sql .= ' AND ce.municipio_id = :municipio_id';
+            $params[':municipio_id'] = $municipioId;
+        }
+        return ['sql' => $sql, 'params' => $params];
+    }
+
+    /**
      * Resumen gerencial: métricas y desgloses filtrados por fecha de entrega (inclusive).
      * Solo se consideran entregas con fecha_entrega no nula.
      */
-    public function resumenGerencial(string $fechaDesde, string $fechaHasta): array {
+    public function resumenGerencial(string $fechaDesde, string $fechaHasta, int $departamentoId = 0, int $municipioId = 0): array {
         $vacio = [
             'rango' => ['desde' => $fechaDesde, 'hasta' => $fechaHasta],
+            'filtros' => ['departamento_id' => $departamentoId, 'municipio_id' => $municipioId],
             'kpis' => [
                 'total_entregas' => 0,
                 'total_unidades' => 0,
@@ -123,23 +209,28 @@ class Reporte {
 
         try {
             $rango = 'e.fecha_entrega IS NOT NULL AND DATE(e.fecha_entrega) BETWEEN :desde AND :hasta';
+            $filtroTerritorial = $this->construirFiltroTerritorial($departamentoId, $municipioId);
+            $whereBase = "{$rango}{$filtroTerritorial['sql']}";
+            $params = array_merge([':desde' => $fechaDesde, ':hasta' => $fechaHasta], $filtroTerritorial['params']);
 
             $sqlKpi = "SELECT 
                             COUNT(DISTINCT e.id_entrega) AS total_entregas,
                             COUNT(DISTINCT e.id_institucion) AS centros_unicos,
                             COUNT(DISTINCT e.id_contrato) AS contratos_unicos
                        FROM entregas e
-                       WHERE {$rango}";
+                       LEFT JOIN centros_educativos ce ON e.id_institucion = ce.centro_id
+                       WHERE {$whereBase}";
             $st = $this->conn->prepare($sqlKpi);
-            $st->execute([':desde' => $fechaDesde, ':hasta' => $fechaHasta]);
+            $st->execute($params);
             $k = $st->fetch(PDO::FETCH_ASSOC) ?: [];
 
             $sqlUni = "SELECT COALESCE(SUM(ed.cantidad), 0) AS total_unidades
                        FROM entregas e
                        INNER JOIN entregas_detalle ed ON ed.id_entrega = e.id_entrega
-                       WHERE {$rango}";
+                       LEFT JOIN centros_educativos ce ON e.id_institucion = ce.centro_id
+                       WHERE {$whereBase}";
             $st = $this->conn->prepare($sqlUni);
-            $st->execute([':desde' => $fechaDesde, ':hasta' => $fechaHasta]);
+            $st->execute($params);
             $u = $st->fetch(PDO::FETCH_ASSOC);
 
             $kpis = [
@@ -151,11 +242,12 @@ class Reporte {
 
             $sqlEst = "SELECT e.estado, COUNT(DISTINCT e.id_entrega) AS cantidad
                        FROM entregas e
-                       WHERE {$rango}
+                       LEFT JOIN centros_educativos ce ON e.id_institucion = ce.centro_id
+                       WHERE {$whereBase}
                        GROUP BY e.estado
                        ORDER BY cantidad DESC";
             $st = $this->conn->prepare($sqlEst);
-            $st->execute([':desde' => $fechaDesde, ':hasta' => $fechaHasta]);
+            $st->execute($params);
             $porEstado = $st->fetchAll(PDO::FETCH_ASSOC);
 
             $sqlTop = "SELECT 
@@ -165,12 +257,13 @@ class Reporte {
                        FROM entregas e
                        INNER JOIN entregas_detalle ed ON ed.id_entrega = e.id_entrega
                        LEFT JOIN equipos eq ON ed.id_equipo = eq.id_equipo
-                       WHERE {$rango}
+                       LEFT JOIN centros_educativos ce ON e.id_institucion = ce.centro_id
+                       WHERE {$whereBase}
                        GROUP BY ed.id_equipo
                        ORDER BY total_cantidad DESC
                        LIMIT 20";
             $st = $this->conn->prepare($sqlTop);
-            $st->execute([':desde' => $fechaDesde, ':hasta' => $fechaHasta]);
+            $st->execute($params);
             $top = $st->fetchAll(PDO::FETCH_ASSOC);
 
             $sqlMes = "SELECT 
@@ -179,11 +272,12 @@ class Reporte {
                             COALESCE(SUM(ed.cantidad), 0) AS unidades
                        FROM entregas e
                        LEFT JOIN entregas_detalle ed ON ed.id_entrega = e.id_entrega
-                       WHERE {$rango}
+                       LEFT JOIN centros_educativos ce ON e.id_institucion = ce.centro_id
+                       WHERE {$whereBase}
                        GROUP BY DATE_FORMAT(e.fecha_entrega, '%Y-%m')
                        ORDER BY periodo ASC";
             $st = $this->conn->prepare($sqlMes);
-            $st->execute([':desde' => $fechaDesde, ':hasta' => $fechaHasta]);
+            $st->execute($params);
             $porMes = $st->fetchAll(PDO::FETCH_ASSOC);
 
             foreach ($porMes as &$fila) {
@@ -205,6 +299,7 @@ class Reporte {
 
             return [
                 'rango' => ['desde' => $fechaDesde, 'hasta' => $fechaHasta],
+                'filtros' => ['departamento_id' => $departamentoId, 'municipio_id' => $municipioId],
                 'kpis' => $kpis,
                 'por_estado' => $porEstado,
                 'top_productos' => $top,
@@ -219,11 +314,14 @@ class Reporte {
     /**
      * Centros que recibieron un producto (equipo) en el rango de fechas, con unidades agregadas.
      */
-    public function centrosPorProductoEnRango(int $idEquipo, string $fechaDesde, string $fechaHasta): array {
+    public function centrosPorProductoEnRango(int $idEquipo, string $fechaDesde, string $fechaHasta, int $departamentoId = 0, int $municipioId = 0): array {
         try {
+            $filtroTerritorial = $this->construirFiltroTerritorial($departamentoId, $municipioId);
             $sql = "SELECT 
                         e.id_institucion,
                         COALESCE(MAX(ce.nombre_ce), CONCAT('Institución ID ', e.id_institucion)) AS nombre_ce,
+                        MAX(ce.departamento) AS departamento,
+                        MAX(ce.municipio) AS municipio,
                         MAX(ce.codigo_infraestructura) AS codigo_infraestructura,
                         SUM(ed.cantidad) AS unidades,
                         COUNT(DISTINCT e.id_entrega) AS num_entregas
@@ -233,14 +331,15 @@ class Reporte {
                     WHERE ed.id_equipo = :id_equipo
                       AND e.fecha_entrega IS NOT NULL
                       AND DATE(e.fecha_entrega) BETWEEN :desde AND :hasta
+                      {$filtroTerritorial['sql']}
                     GROUP BY e.id_institucion
                     ORDER BY unidades DESC, nombre_ce ASC";
             $st = $this->conn->prepare($sql);
-            $st->execute([
+            $st->execute(array_merge([
                 ':id_equipo' => $idEquipo,
                 ':desde' => $fechaDesde,
                 ':hasta' => $fechaHasta,
-            ]);
+            ], $filtroTerritorial['params']));
             $filas = $st->fetchAll(PDO::FETCH_ASSOC);
             foreach ($filas as &$f) {
                 $f['unidades'] = (int) $f['unidades'];
@@ -252,6 +351,67 @@ class Reporte {
         } catch (PDOException $e) {
             error_log($e->getMessage());
             return [];
+        }
+    }
+
+    /**
+     * Vista general de calendarización de rutas de entrega por rango de fecha programada.
+     */
+    public function calendarizacionRutas(string $fechaDesde, string $fechaHasta, int $departamentoId = 0, int $municipioId = 0): array {
+        $vacio = ['resumen_estado' => [], 'rutas' => []];
+        try {
+            $filtroTerritorial = $this->construirFiltroTerritorial($departamentoId, $municipioId);
+            $where = "r.fecha_programada IS NOT NULL
+                      AND r.fecha_programada BETWEEN :desde AND :hasta
+                      {$filtroTerritorial['sql']}";
+            $params = array_merge([':desde' => $fechaDesde, ':hasta' => $fechaHasta], $filtroTerritorial['params']);
+
+            $sqlResumen = "SELECT r.estado, COUNT(*) AS cantidad
+                           FROM rutas_entrega r
+                           LEFT JOIN centros_educativos ce ON ce.centro_id = r.id_institucion
+                           WHERE {$where}
+                           GROUP BY r.estado
+                           ORDER BY cantidad DESC, r.estado ASC";
+            $st = $this->conn->prepare($sqlResumen);
+            $st->execute($params);
+            $resumen = $st->fetchAll(PDO::FETCH_ASSOC);
+            foreach ($resumen as &$r) {
+                $r['cantidad'] = (int) ($r['cantidad'] ?? 0);
+            }
+            unset($r);
+
+            $sqlRutas = "SELECT
+                            r.id,
+                            r.contrato_id,
+                            COALESCE(c.numero_contrato, CONCAT('Contrato #', r.contrato_id)) AS numero_contrato,
+                            r.id_institucion,
+                            COALESCE(ce.nombre_ce, CONCAT('Institución ID ', r.id_institucion)) AS nombre_ce,
+                            COALESCE(ce.departamento, '') AS departamento,
+                            COALESCE(ce.municipio, '') AS municipio,
+                            ce.codigo_infraestructura,
+                            r.responsable_entrega,
+                            r.motorista,
+                            r.vehiculo,
+                            r.placas,
+                            r.estado,
+                            r.fecha_programada,
+                            r.fecha_en_ruta,
+                            r.fecha_entregado,
+                            r.comentarios
+                         FROM rutas_entrega r
+                         LEFT JOIN centros_educativos ce ON ce.centro_id = r.id_institucion
+                         LEFT JOIN contratos c ON c.id = r.contrato_id
+                         WHERE {$where}
+                         ORDER BY r.fecha_programada ASC, r.estado ASC, nombre_ce ASC
+                         LIMIT 300";
+            $st = $this->conn->prepare($sqlRutas);
+            $st->execute($params);
+            $rutas = $st->fetchAll(PDO::FETCH_ASSOC);
+
+            return ['resumen_estado' => $resumen, 'rutas' => $rutas];
+        } catch (PDOException $e) {
+            error_log($e->getMessage());
+            return $vacio;
         }
     }
 }

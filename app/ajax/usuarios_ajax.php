@@ -1,5 +1,9 @@
 <?php
 header('Content-Type: application/json');
+require_once __DIR__ . '/../includes/verificar_sesion.php';
+if (!usuarioEsAdmin()) {
+    denegarAccesoApi('Solo administradores pueden gestionar usuarios.');
+}
 require_once __DIR__ . '/../clases/Usuario.php'; // Usamos la clase que ya creamos
 
 $usuarioModel = new Usuario();

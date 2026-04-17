@@ -10,6 +10,13 @@
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 
 <script src="<?php echo APP_URL; ?>/assets/js/app.js"></script>
+<script>
+window.APP_PERMISOS = {
+    esAdmin: <?php echo usuarioEsAdmin() ? 'true' : 'false'; ?>,
+    puedeEscribir: <?php echo usuarioPuedeEscribir() ? 'true' : 'false'; ?>,
+    puedeEliminar: <?php echo usuarioPuedeEliminar() ? 'true' : 'false'; ?>
+};
+</script>
 
 <?php if (!empty($extra_scripts) && is_array($extra_scripts)): ?>
 <?php foreach ($extra_scripts as $url): ?>

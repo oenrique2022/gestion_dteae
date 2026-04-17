@@ -34,3 +34,45 @@ function redirigirALogin(): void {
 if (!isset($_SESSION['id_usuario'])) {
     redirigirALogin();
 }
+
+/**
+ * Roles esperados en BD:
+ * 1 = Administradores, 2 = Digitadores, 3 = Consulta.
+ */
+function usuarioRolId(): int {
+    return isset($_SESSION['id_rol']) ? (int) $_SESSION['id_rol'] : 0;
+}
+
+function usuarioEsAdmin(): bool {
+    return usuarioRolId() === 1;
+}
+
+function usuarioEsDigitador(): bool {
+    return usuarioRolId() === 2;
+}
+
+function usuarioEsConsulta(): bool {
+    return usuarioRolId() === 3;
+}
+
+function usuarioPuedeEscribir(): bool {
+    $rol = usuarioRolId();
+    return $rol === 1 || $rol === 2;
+}
+
+function usuarioPuedeEliminar(): bool {
+    return usuarioEsAdmin();
+}
+
+function denegarAccesoPagina(): void {
+    http_response_code(403);
+    echo 'Acceso denegado.';
+    exit();
+}
+
+function denegarAccesoApi(string $mensaje = 'No autorizado para esta acción.'): void {
+    http_response_code(403);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['success' => false, 'message' => $mensaje], JSON_UNESCAPED_UNICODE);
+    exit();
+}

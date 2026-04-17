@@ -25,9 +25,16 @@ require_once __DIR__ . '/../app/includes/config.php'; ?>
         </button>
         <div class="collapse navbar-collapse" id="mainNav">
             <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-                <li class="nav-item"><a class="nav-link" href="gestion_usuarios.php">Usuarios</a></li>
+                <?php if (usuarioEsAdmin()): ?>
+                    <li class="nav-item"><a class="nav-link" href="gestion_usuarios.php">Usuarios</a></li>
+                <?php endif; ?>
                 <li class="nav-item"><a class="nav-link" href="gestion_proveedores.php">Proveedores</a></li>
-                <li class="nav-item"><a class="nav-link" href="#">Catálogos</a></li>
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">Catálogos</a>
+                    <ul class="dropdown-menu">
+                        <li><a class="dropdown-item" href="gestion_centros_educativos.php"><i class="fas fa-school me-2 text-primary"></i>Centros educativos</a></li>
+                    </ul>
+                </li>
                 <li class="nav-item"><a class="nav-link" href="gestion_contratos.php">Contratos</a></li>
                 <li class="nav-item dropdown">
                     <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">Reportes</a>

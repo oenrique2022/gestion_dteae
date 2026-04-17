@@ -3,6 +3,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Revisa si estamos en la página de gestión de proveedores
     if (document.getElementById('tablaProveedoresBody')) {
+        const permisos = window.APP_PERMISOS || {};
+        const puedeEscribir = !!permisos.puedeEscribir;
+        const puedeEliminar = !!permisos.puedeEliminar;
         const proveedorModal = new bootstrap.Modal(document.getElementById('proveedorModal'));
         const proveedorForm = document.getElementById('proveedorForm');
         const modalTitle = document.getElementById('modalTitle');
@@ -23,12 +26,12 @@ document.addEventListener('DOMContentLoaded', function() {
                                     <td>${p.telefono_contacto}</td>
                                     <td>${p.email_contacto}</td>
                                     <td class="text-end">
-                                        <button class="btn btn-warning btn-sm btn-editar" data-id="${p.id_proveedor}">
+                                        ${puedeEscribir ? `<button class="btn btn-warning btn-sm btn-editar" data-id="${p.id_proveedor}">
                                             <i class="fas fa-edit"></i>
-                                        </button>
-                                        <button class="btn btn-danger btn-sm btn-eliminar" data-id="${p.id_proveedor}">
+                                        </button>` : ''}
+                                        ${puedeEliminar ? `<button class="btn btn-danger btn-sm btn-eliminar" data-id="${p.id_proveedor}">
                                             <i class="fas fa-trash"></i>
-                                        </button>
+                                        </button>` : ''}
                                     </td>
                                 </tr>
                             `;
@@ -40,16 +43,25 @@ document.addEventListener('DOMContentLoaded', function() {
         };
 
         // Abrir modal para un nuevo proveedor
-        document.getElementById('btnNuevoProveedor').addEventListener('click', () => {
-            proveedorForm.reset();
-            document.getElementById('id_proveedor').value = '';
-            modalTitle.textContent = 'Nuevo Proveedor';
-            proveedorModal.show();
-        });
+        const btnNuevo = document.getElementById('btnNuevoProveedor');
+        if (btnNuevo) {
+            btnNuevo.style.display = puedeEscribir ? '' : 'none';
+            btnNuevo.addEventListener('click', () => {
+                if (!puedeEscribir) return;
+                proveedorForm.reset();
+                document.getElementById('id_proveedor').value = '';
+                modalTitle.textContent = 'Nuevo Proveedor';
+                proveedorModal.show();
+            });
+        }
 
         // Guardar (Crear o Actualizar) proveedor
         proveedorForm.addEventListener('submit', function(e) {
             e.preventDefault();
+            if (!puedeEscribir) {
+                Swal.fire('Sin permiso', 'Solo puede consultar esta sección.', 'warning');
+                return;
+            }
             const formData = new FormData(this);
 
             fetch('../app/ajax/proveedores_ajax.php?action=guardar', {
@@ -77,6 +89,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // Botón Editar
             if (target.classList.contains('btn-editar')) {
+                if (!puedeEscribir) return;
                 fetch(`../app/ajax/proveedores_ajax.php?action=obtener&id=${id}`)
                 .then(response => response.json())
                 .then(data => {
@@ -96,6 +109,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // Botón Eliminar
             if (target.classList.contains('btn-eliminar')) {
+                if (!puedeEliminar) return;
                 Swal.fire({
                     title: '¿Estás seguro?',
                     text: "¡No podrás revertir esta acción!",

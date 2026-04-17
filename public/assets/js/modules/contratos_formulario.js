@@ -101,6 +101,52 @@ $(document).ready(function () {
         return d.innerHTML;
     };
 
+    const basePublic = () => (typeof window.APP_PUBLIC_BASE === 'string' ? window.APP_PUBLIC_BASE : '').replace(/\/$/, '');
+    const urlAjaxContratos =
+        typeof window.URL_AJAX_CONTRATOS === 'string' ? window.URL_AJAX_CONTRATOS : '../app/ajax/contratos_ajax.php';
+
+    const fmtFechaDoc = (s) => {
+        if (s == null || String(s).trim() === '') return '—';
+        const raw = String(s).trim();
+        const d = new Date(raw.replace(' ', 'T'));
+        if (Number.isNaN(d.getTime())) return escHtml(raw.length > 19 ? raw.substring(0, 19) : raw);
+        try {
+            return escHtml(d.toLocaleString('es-CR', { dateStyle: 'short', timeStyle: 'short' }));
+        } catch (e) {
+            return escHtml(raw);
+        }
+    };
+
+    const renderComentarioAdicionalDocumentoHtml = (comentario, fecha) =>
+        `<div class="mb-1 text-secondary">
+            <i class="fas fa-comment-dots me-1"></i>${escHtml(comentario || '')}
+            <span class="text-muted">— ${fmtFechaDoc(fecha)}</span>
+        </div>`;
+
+    const renderListaDocumentosEntregaHtml = (docs) => {
+        if (!docs || !docs.length) return '';
+        const root = basePublic();
+        let html = '';
+        docs.forEach((doc) => {
+            const href = root + (doc.ruta_archivo || '');
+            const nombre = escHtml(doc.nombre_archivo || 'archivo.pdf');
+            const com = escHtml(doc.comentario || '');
+            const fecha = fmtFechaDoc(doc.fecha_subida);
+            html += `<div class="list-group-item">
+                <div class="d-flex justify-content-between align-items-start gap-2">
+                    <div>
+                        <a href="${escHtml(href)}" target="_blank" rel="noopener" class="fw-semibold text-decoration-none"><i class="fas fa-file-pdf text-danger me-1"></i>${nombre}</a>
+                        <div class="small text-muted mt-1"><i class="fas fa-clock me-1"></i>${fecha}</div>
+                        <p class="mb-0 small fst-italic text-secondary mt-1">"${com}"</p>
+                    </div>
+                </div>
+            </div>`;
+        });
+        return html;
+    };
+
+    const modalDocumentosEntregaEl = document.getElementById('modalDocumentosEntrega');
+
     const textoCentroPorId = (idInst) => {
         if (idInst == null || idInst === '') return '—';
         const val = String(idInst);
@@ -162,6 +208,19 @@ $(document).ready(function () {
                         ? String(entrega.fecha_entrega).substring(0, 10)
                         : '—';
                 const estado = (entrega.estado && String(entrega.estado).trim()) || '—';
+                const idContratoVal = ($('#id_contrato').val() || '').trim();
+                const puedeSubirDoc = modoFormulario === 'editar' && idContratoVal !== '';
+                const docsArr = Array.isArray(entrega.documentos_entrega) ? entrega.documentos_entrega : [];
+                const nDocs = docsArr.length;
+                const btnDocs = puedeSubirDoc
+                    ? `<button type="button" class="btn btn-sm btn-outline-success btn-docs-entrega position-relative" data-entrega-id="${escHtml(
+                          sid
+                      )}" title="Comprobantes PDF por centro"><i class="fas fa-file-upload"></i>${
+                          nDocs > 0
+                              ? `<span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-success" style="font-size:0.65rem">${nDocs}</span>`
+                              : ''
+                      }</button>`
+                    : '';
                 const pdfBtn = idEntregaEsPersistida(rawId)
                     ? `<a class="btn btn-sm btn-outline-secondary" href="acta_entrega_pdf.php?id_entrega=${encodeURIComponent(
                           String(Math.trunc(Number(rawId)))
@@ -175,6 +234,7 @@ $(document).ready(function () {
                     <td><span class="badge ${estado === 'Entregado' ? 'bg-success' : 'bg-info text-dark'}">${escHtml(estado)}</span></td>
                     <td class="text-end text-nowrap">
                         <button type="button" class="btn btn-sm btn-outline-primary btn-detalle-entrega" data-entrega-id="${escHtml(sid)}"><i class="fas fa-edit me-1"></i>Detalles</button>
+                        ${btnDocs}
                         ${pdfBtn}
                         <button type="button" class="btn btn-sm btn-outline-danger btn-quitar-entrega-resumen" data-entrega-id="${escHtml(sid)}" title="Quitar esta entrega del borrador"><i class="fas fa-times"></i></button>
                     </td>
@@ -609,6 +669,7 @@ $(document).ready(function () {
             firma_responsable: $('#modal_entrega_firma').val() || '',
             estado: $('#modal_entrega_estado').val() || 'En proceso',
             comentarios: $('#modal_entrega_comentarios').val() || '',
+            documentos_entrega: [],
             detalle
         };
 
@@ -673,6 +734,108 @@ $(document).ready(function () {
         setTimeout(() => abrirModalEditarEntrega(id), 200);
     });
 
+    const abrirModalDocumentosEntrega = function (entregaIdRaw) {
+        const entregaId = String(entregaIdRaw);
+        const entrega = listaEntregas().find((x) => String(idEntregaDeObj(x)) === entregaId);
+        if (!entrega) {
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({ icon: 'error', title: 'No se encontró la entrega', text: 'Recargue la página e intente de nuevo.' });
+            } else {
+                window.alert('No se encontró la entrega.');
+            }
+            return;
+        }
+        $('#doc_entrega_id_entrega_ctx').val(entregaId);
+        const centro = textoCentroPorId(entrega.id_institucion ?? entrega.ID_INSTITUCION);
+        $('#modalDocumentosEntregaTitulo').html('<i class="fas fa-file-upload me-2"></i>Comprobantes de entrega');
+        $('#modalDocumentosEntregaSubtitulo').text(centro);
+        const docs = Array.isArray(entrega.documentos_entrega) ? entrega.documentos_entrega : [];
+        $('#modalDocumentosEntregaLista').html(renderListaDocumentosEntregaHtml(docs));
+        $('#modalDocumentosEntregaVacio').toggleClass('d-none', docs.length > 0);
+        $('#doc_entrega_comentario').val('');
+        $('#doc_entrega_archivo').val('');
+        if (modalDocumentosEntregaEl) {
+            mostrarModalBootstrap(modalDocumentosEntregaEl);
+        }
+    };
+
+    $(document).on('click', '.btn-docs-entrega', function (e) {
+        e.preventDefault();
+        const id = String($(this).attr('data-entrega-id') || '');
+        if (!id) return;
+        listaEntregas();
+        abrirPestanaEntregas();
+        abrirModalDocumentosEntrega(id);
+    });
+
+    $('#formSubirDocEntrega').on('submit', function (e) {
+        e.preventDefault();
+        const idContrato = ($('#id_contrato').val() || '').trim();
+        const entregaId = String($('#doc_entrega_id_entrega_ctx').val() || '');
+        const fileInput = document.getElementById('doc_entrega_archivo');
+        if (!idContrato) {
+            Swal.fire({ icon: 'warning', title: 'Guarde el contrato primero', text: 'Debe existir un contrato guardado para adjuntar PDFs por centro.' });
+            return;
+        }
+        if (!fileInput || !fileInput.files || !fileInput.files[0]) {
+            Swal.fire({ icon: 'warning', title: 'Seleccione un PDF' });
+            return;
+        }
+        const entrega = listaEntregas().find((x) => String(idEntregaDeObj(x)) === entregaId);
+        if (!entrega) {
+            Swal.fire({ icon: 'error', title: 'Entrega no encontrada' });
+            return;
+        }
+        const idInst = entrega.id_institucion ?? entrega.ID_INSTITUCION;
+        if (idInst == null || idInst === '') {
+            Swal.fire({ icon: 'error', title: 'Centro no válido' });
+            return;
+        }
+
+        const fd = new FormData();
+        fd.append('action', 'subir_documento_entrega');
+        fd.append('id_contrato', idContrato);
+        fd.append('id_institucion', String(idInst));
+        fd.append('comentario_archivo', $('#doc_entrega_comentario').val() || '');
+        fd.append('archivo_pdf', fileInput.files[0]);
+
+        const $btn = $('#btnSubirDocEntrega').prop('disabled', true);
+        Swal.fire({ title: 'Subiendo…', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+
+        fetch(urlAjaxContratos, { method: 'POST', body: fd, credentials: 'same-origin' })
+            .then((r) => r.json())
+            .then((data) => {
+                Swal.close();
+                if (!data.success) {
+                    Swal.fire({ icon: 'error', title: 'No se pudo subir', text: data.message || 'Error desconocido' });
+                    return;
+                }
+                const ec = listaEntregas();
+                const ix = ec.findIndex((x) => String(idEntregaDeObj(x)) === entregaId);
+                if (ix !== -1 && data.documento) {
+                    if (!Array.isArray(ec[ix].documentos_entrega)) {
+                        ec[ix].documentos_entrega = [];
+                    }
+                    ec[ix].documentos_entrega.unshift(data.documento);
+                    ec[ix].estado = data.estado || 'Entregado';
+                }
+                refrescarTablaEntregas();
+                if (ix !== -1 && data.documento) {
+                    const docs2 = ec[ix].documentos_entrega;
+                    $('#modalDocumentosEntregaLista').html(renderListaDocumentosEntregaHtml(docs2));
+                    $('#modalDocumentosEntregaVacio').toggleClass('d-none', docs2.length > 0);
+                }
+                $('#doc_entrega_archivo').val('');
+                $('#doc_entrega_comentario').val('');
+                Swal.fire({ icon: 'success', title: 'Listo', text: data.message || 'PDF registrado.', timer: 2200, showConfirmButton: true });
+            })
+            .catch(() => {
+                Swal.close();
+                Swal.fire({ icon: 'error', title: 'Error de red', text: 'No se pudo contactar al servidor.' });
+            })
+            .finally(() => $btn.prop('disabled', false));
+    });
+
     $(document).on('click', '.btn-quitar-entrega-resumen', function (e) {
         e.preventDefault();
         const id = $(this).attr('data-entrega-id');
@@ -717,12 +880,53 @@ $(document).ready(function () {
     });
 
     if (listaArchivosExistentes && listaArchivosExistentes.length) {
+        listaArchivosExistentes.on('click', '.btn-comentar-documento', function () {
+            const id_documento = $(this).data('id');
+            if (!id_documento) return;
+
+            Swal.fire({
+                title: 'Agregar comentario',
+                input: 'textarea',
+                inputLabel: 'Comentario adicional para este archivo',
+                inputPlaceholder: 'Escriba el comentario...',
+                showCancelButton: true,
+                confirmButtonText: 'Guardar comentario',
+                cancelButtonText: 'Cancelar',
+                inputAttributes: { maxlength: 1000 }
+            }).then((r) => {
+                if (!r.isConfirmed) return;
+                const comentario = (r.value || '').trim();
+                if (!comentario) {
+                    Swal.fire('Atención', 'Debe escribir un comentario.', 'warning');
+                    return;
+                }
+                $.post(
+                    urlAjaxContratos,
+                    { action: 'agregar_comentario_documento', id_documento, comentario },
+                    function (data) {
+                        if (!data.success) {
+                            Swal.fire('Error', data.message || 'No se pudo guardar el comentario.', 'error');
+                            return;
+                        }
+                        const row = data.comentario || {};
+                        const $box = $(`#doc-comments-${id_documento}`);
+                        $(`#doc-comments-empty-${id_documento}`).remove();
+                        $box.prepend(
+                            renderComentarioAdicionalDocumentoHtml(row.comentario || comentario, row.fecha_comentario || '')
+                        );
+                        Swal.fire('Listo', data.message || 'Comentario agregado.', 'success');
+                    },
+                    'json'
+                ).fail(() => Swal.fire('Error', 'Sin conexión.', 'error'));
+            });
+        });
+
         listaArchivosExistentes.on('click', '.btn-eliminar-documento', function () {
             const id_documento = $(this).data('id');
             if (id_documento) {
                 Swal.fire({ title: '¿Eliminar archivo?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Sí, eliminar' }).then((r) => {
                     if (!r.isConfirmed) return;
-                    $.post('../app/ajax/contratos_ajax.php', { action: 'eliminar_documento', id_documento }, function (data) {
+                    $.post(urlAjaxContratos, { action: 'eliminar_documento', id_documento }, function (data) {
                         if (data.success) {
                             $(`#doc-${id_documento}`).remove();
                             Swal.fire('Listo', 'Archivo eliminado.', 'success');
@@ -743,7 +947,7 @@ $(document).ready(function () {
         Swal.fire({ title: 'Guardando contrato', text: 'Por favor espere…', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
 
         $.ajax({
-            url: '../app/ajax/contratos_ajax.php',
+            url: urlAjaxContratos,
             type: 'POST',
             data: formData,
             processData: false,
@@ -751,9 +955,16 @@ $(document).ready(function () {
             dataType: 'json',
             success: function (data) {
                 if (data.success) {
-                    Swal.fire('¡Listo!', data.message, 'success').then(() => {
-                        window.location.href = 'gestion_contratos.php';
-                    });
+                    if (action === 'guardar' && data.id_contrato) {
+                        Swal.fire('¡Listo!', data.message, 'success').then(() => {
+                            window.location.href =
+                                'editar_contrato.php?id=' + encodeURIComponent(String(data.id_contrato));
+                        });
+                    } else {
+                        Swal.fire('¡Listo!', data.message, 'success').then(() => {
+                            window.location.reload();
+                        });
+                    }
                 } else Swal.fire('Error', data.message || 'Ocurrió un error.', 'error');
             },
             error: function () {
