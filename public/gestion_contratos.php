@@ -3,7 +3,7 @@
 <div class="card shadow-sm">
     <div class="card-header d-flex justify-content-between align-items-center">
         <h2 class="h5 mb-0">
-            <i class="fas fa-file-signature me-2"></i>Gestión de Contratos
+            <i class="fas fa-file-signature me-2"></i>Gestión de Contratos DTEAE
         </h2>
         <?php if (usuarioPuedeEscribir()): ?>
             <a href="crear_contrato.php" class="btn btn-primary btn-sm">
